@@ -1,0 +1,79 @@
+##################################################
+# Angular (Frontend)
+##################################################
+
+# Node modules
+frontend/node_modules/
+node_modules/
+
+# Angular build output
+frontend/dist/
+dist/
+
+# Angular cache
+frontend/.angular/
+.angular/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (optional if sensitive)
+frontend/src/environments/*.local.ts
+
+##################################################
+# .NET (Backend)
+##################################################
+
+# Build results
+backend/bin/
+backend/obj/
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# Publish output
+backend/publish/
+publish/
+
+# ASP.NET logs
+logs/
+*.db
+
+##################################################
+# OS Files
+##################################################
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+##################################################
+# Coverage / Test Results
+##################################################
+
+coverage/
+TestResults/
+
+##################################################
+# Environment Files
+##################################################
+
+.env
+.env.*
