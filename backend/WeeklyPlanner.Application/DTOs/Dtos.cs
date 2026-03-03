@@ -1,5 +1,6 @@
 using WeeklyPlanner.Domain.Enums;
 
+
 namespace WeeklyPlanner.Application.DTOs;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +70,8 @@ public record WeeklyPlanTaskDto(
     string AssignedUserName,
     decimal PlannedHours,
     decimal CompletedHours,
-    decimal ProgressPercent
+    decimal ProgressPercent,
+    WorkItemStatus Status
 );
 
 /// <summary>Request model for assigning a backlog item to a user within a weekly plan.</summary>
@@ -79,8 +81,8 @@ public record AssignTaskRequest(
     decimal PlannedHours
 );
 
-/// <summary>Request model for updating a task's completed hours (post-freeze progress tracking).</summary>
-public record UpdateProgressRequest(int TaskId, decimal CompletedHours);
+/// <summary>Request model for updating a task's completed hours and status (post-freeze progress tracking).</summary>
+public record UpdateProgressRequest(int TaskId, decimal CompletedHours, WorkItemStatus? Status = null);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD DTOs
@@ -113,3 +115,26 @@ public record UserProgressDto(
     decimal ProgressPercent,
     IEnumerable<WeeklyPlanTaskDto> Tasks
 );
+/// <summary>Root export/import payload representing the full app state.</summary>
+public record AppExportDto(
+    IEnumerable<AppExportUserDto>     Users,
+    IEnumerable<AppExportBacklogDto>  BacklogItems,
+    IEnumerable<AppExportPlanDto>     WeeklyPlans,
+    IEnumerable<AppExportTaskDto>     WeeklyPlanTasks,
+    DateTime ExportedAt
+);
+
+public record AppExportUserDto(int Id, string Name, UserRole Role, bool IsActive);
+
+public record AppExportBacklogDto(
+    int Id, string Title, string Description,
+    CategoryType Category, bool IsActive, int? EstimatedHours);
+
+public record AppExportPlanDto(
+    int Id, DateTime WeekStartDate, DateTime WeekEndDate,
+    decimal ClientPercent, decimal TechDebtPercent, decimal RDPercent,
+    PlanStatus Status, DateTime CreatedAt, DateTime? FrozenAt, DateTime? CompletedAt);
+
+public record AppExportTaskDto(
+    int Id, int WeeklyPlanId, int BacklogItemId, int AssignedUserId,
+    decimal PlannedHours, decimal CompletedHours, WorkItemStatus Status);

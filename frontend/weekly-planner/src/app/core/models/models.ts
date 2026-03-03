@@ -5,6 +5,8 @@
 export type UserRole = 'TeamMember' | 'TeamLead';
 export type CategoryType = 'Client' | 'TechDebt' | 'RnD';
 export type PlanStatus = 'Planning' | 'Frozen' | 'Completed';
+export type WorkItemStatus = 'NotStarted' | 'InProgress' | 'Completed' | 'Blocked';
+
 
 export interface User {
   id: number;
@@ -46,6 +48,7 @@ export interface WeeklyPlanTask {
   plannedHours: number;
   completedHours: number;
   progressPercent: number;
+  status: WorkItemStatus;
 }
 
 export interface CategoryProgress {
@@ -108,6 +111,7 @@ export interface AssignTaskRequest {
 export interface UpdateProgressRequest {
   taskId: number;
   completedHours: number;
+  status?: WorkItemStatus;
 }
 
 /* ── UI Helpers ─────────────────────────────────────────────────────────── */

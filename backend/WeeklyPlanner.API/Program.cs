@@ -3,6 +3,8 @@ using WeeklyPlanner.Application.Interfaces;
 using WeeklyPlanner.Application.Services;
 using WeeklyPlanner.Infrastructure.Data;
 using WeeklyPlanner.Infrastructure.Repositories;
+using WeeklyPlanner.Infrastructure.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +60,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBacklogService, BacklogService>();
 builder.Services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 // ── Global Exception Handling ─────────────────────────────────────────────
 builder.Services.AddTransient<WeeklyPlanner.API.Middleware.GlobalExceptionHandler>();

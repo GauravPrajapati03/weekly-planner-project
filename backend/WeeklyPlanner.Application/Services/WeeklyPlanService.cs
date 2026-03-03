@@ -178,16 +178,43 @@ public class WeeklyPlanService : IWeeklyPlanService
         if (task.WeeklyPlanId != weeklyPlanId)
             throw new BusinessRuleException("Task does not belong to the specified weekly plan.");
 
-        // BR-4: CompletedHours must be ≥ 0
+        // BR-4: CompletedHours must be ≥ 0 (overrun is allowed — demo shows a warning instead of blocking)
         if (request.CompletedHours < 0)
             throw new BusinessRuleException("Completed hours cannot be negative.");
 
-        // BR-4: CompletedHours must be ≤ PlannedHours
-        if (request.CompletedHours > task.PlannedHours)
-            throw new BusinessRuleException(
-                $"Completed hours ({request.CompletedHours}h) cannot exceed planned hours ({task.PlannedHours}h).");
-
         task.CompletedHours = request.CompletedHours;
+
+        // Update status with transition validation
+        if (request.Status.HasValue)
+        {
+            var newStatus = request.Status.Value;
+            var currentStatus = task.Status;
+
+            // Enforce valid transitions per demo business rules
+            bool validTransition = (currentStatus, newStatus) switch
+            {
+                // Forward progression
+                (WorkItemStatus.NotStarted, WorkItemStatus.InProgress)  => true,
+                (WorkItemStatus.InProgress, WorkItemStatus.Completed)   => true,
+                // Skip transition is NOT allowed
+                (WorkItemStatus.NotStarted, WorkItemStatus.Completed)   => false,
+                // Any status can go Blocked
+                (_, WorkItemStatus.Blocked)                          => true,
+                // Unblock → resume
+                (WorkItemStatus.Blocked, WorkItemStatus.InProgress)     => true,
+                // Same status is always fine (no-op)
+                var (cur, nxt) when cur == nxt                  => true,
+                _                                                => false
+            };
+
+            if (!validTransition)
+                throw new BusinessRuleException(
+                    $"Invalid status transition: {currentStatus} → {newStatus}. " +
+                    "Must progress NotStarted→InProgress→Completed. Blocked is allowed from any state.");
+
+            task.Status = newStatus;
+        }
+
         await _taskRepository.SaveChangesAsync();
     }
 
@@ -248,6 +275,7 @@ public class WeeklyPlanService : IWeeklyPlanService
             task.Id, task.WeeklyPlanId,
             task.BacklogItemId, item.Title, item.Category,
             task.AssignedUserId, user.Name,
-            task.PlannedHours, task.CompletedHours, progress);
+            task.PlannedHours, task.CompletedHours, progress,
+            task.Status);
     }
 }

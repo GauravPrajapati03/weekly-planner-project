@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { BacklogItem, CategoryType } from '../../core/models/models';
 import { NavbarComponent } from '../../shared/navbar/navbar.component';
@@ -38,12 +39,13 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
           }
         </div>
 
-        <!-- Filters row: availability dropdown + search -->
+        <!-- Filters row: availability dropdown + search (same line) -->
         <div class="filters-row mb-md">
           <select class="form-control filter-select" [(ngModel)]="filterAvailability"
             (ngModelChange)="applyFilters()">
             <option value="available">Available Only</option>
             <option value="all">Show All</option>
+            <option value="completed">Completed</option>
             <option value="archived">Archived</option>
           </select>
           <input class="form-control search-input"
@@ -90,28 +92,30 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
                     View &amp; Edit
                   </button>
 
-                  @if (item.isActive) {
-                    <!-- Active item: Archive button -->
-                    <button class="btn btn--warning-outline btn--sm"
+                  @if (auth.isLead) {
+                    @if (item.isActive) {
+                      <!-- Lead only: Archive button -->
+                      <button class="btn btn--warning-outline btn--sm"
+                        [disabled]="busyId() === item.id"
+                        (click)="archiveItem(item)">
+                        @if (busyId() === item.id) { <span class="spinner"></span> } @else { Archive }
+                      </button>
+                    } @else {
+                      <!-- Lead only: Unarchive button -->
+                      <button class="btn btn--success-outline btn--sm"
+                        [disabled]="busyId() === item.id"
+                        (click)="unarchiveItem(item)">
+                        @if (busyId() === item.id) { <span class="spinner"></span> } @else { Unarchive }
+                      </button>
+                    }
+
+                    <!-- Lead only: Delete button -->
+                    <button class="btn btn--danger-outline btn--sm"
                       [disabled]="busyId() === item.id"
-                      (click)="archiveItem(item)">
-                      @if (busyId() === item.id) { <span class="spinner"></span> } @else { Archive }
-                    </button>
-                  } @else {
-                    <!-- Archived item: Unarchive button -->
-                    <button class="btn btn--success-outline btn--sm"
-                      [disabled]="busyId() === item.id"
-                      (click)="unarchiveItem(item)">
-                      @if (busyId() === item.id) { <span class="spinner"></span> } @else { Unarchive }
+                      (click)="confirmDelete(item)">
+                      Delete
                     </button>
                   }
-
-                  <!-- Delete button always shown -->
-                  <button class="btn btn--danger-outline btn--sm"
-                    [disabled]="busyId() === item.id"
-                    (click)="confirmDelete(item)">
-                    Delete
-                  </button>
                 </div>
               </div>
             }
@@ -208,9 +212,9 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
     .cat-tab--rnd      { background: rgba(34,197,94,0.15);  border-color: rgba(34,197,94,0.4);  color: #4ade80; }
     .cat-tab--active   { box-shadow: 0 0 0 2px currentColor; }
 
-    .filters-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
-    .filter-select { flex: 0 0 auto; min-width: 150px; }
-    .search-input  { flex: 1; min-width: 180px; }
+    .filters-row { display: flex; gap: var(--space-sm); align-items: center; flex-wrap: nowrap; }
+    .filter-select { flex: 0 0 auto; width: auto !important; min-width: 160px; max-width: 200px; }
+    .search-input  { flex: 1 1 auto; width: auto !important; min-width: 0; }
 
     .backlog-list { display: flex; flex-direction: column; gap: var(--space-sm); }
 
@@ -297,6 +301,7 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
 })
 export class ManageBacklogComponent implements OnInit {
   readonly router = inject(Router);
+  readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
 
@@ -332,9 +337,14 @@ export class ManageBacklogComponent implements OnInit {
 
   applyFilters(): void {
     let result = this.allItems();
+    // Category tab filter
     if (this.filterCategory) result = result.filter(i => i.category === this.filterCategory);
+    // Availability filter
     if (this.filterAvailability === 'available') result = result.filter(i => i.isActive);
     else if (this.filterAvailability === 'archived') result = result.filter(i => !i.isActive);
+    else if (this.filterAvailability === 'completed') result = result.filter(i => !i.isActive); // archived = completed in our model
+    // else 'all' shows everything
+    // Search filter
     if (this.searchText.trim())
       result = result.filter(i => i.title.toLowerCase().includes(this.searchText.toLowerCase()));
     this.filtered.set(result);

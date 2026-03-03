@@ -108,4 +108,22 @@ export class ApiService {
     getTasksByUser(planId: number, userId: number): Observable<WeeklyPlanTask[]> {
         return this.http.get<WeeklyPlanTask[]>(`${this.base}/weeklyplan/${planId}/tasks/user/${userId}`);
     }
+
+    // ── Admin / Data Management ───────────────────────────────────────────
+    exportData(): Observable<object> {
+        return this.http.get<object>(`${this.base}/admin/export`);
+    }
+
+    importData(data: object): Observable<{ message: string }> {
+        return this.http.post<{ message: string }>(`${this.base}/admin/import`, data);
+    }
+
+    seedSampleData(): Observable<{ message: string }> {
+        return this.http.post<{ message: string }>(`${this.base}/admin/seed`, {});
+    }
+
+    resetApp(): Observable<{ message: string }> {
+        return this.http.delete<{ message: string }>(`${this.base}/admin/reset`);
+    }
 }
+

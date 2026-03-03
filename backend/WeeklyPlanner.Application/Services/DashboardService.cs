@@ -130,6 +130,7 @@ public class DashboardService : IDashboardService
             task.Id, task.WeeklyPlanId,
             task.BacklogItemId, itemTitle, category,
             task.AssignedUserId, userName,
-            task.PlannedHours, task.CompletedHours, progress);
+            task.PlannedHours, task.CompletedHours, progress,
+            task.Status);
     }
 }

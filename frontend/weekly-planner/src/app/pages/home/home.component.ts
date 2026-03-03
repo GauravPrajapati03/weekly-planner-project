@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -18,7 +19,7 @@ interface ActionCard {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, NavbarComponent],
+  imports: [CommonModule, RouterLink, FormsModule, NavbarComponent],
   template: `
     <app-navbar />
     <div class="page">
@@ -87,6 +88,26 @@ interface ActionCard {
       </div>
     </div>
 
+    <!-- ── Data Management Bottom Bar ──────────────────────────────────── -->
+    <!-- Hidden file input for Load from File -->
+    <input #fileInput type="file" accept=".json" style="display:none"
+      (change)="onFileSelected($event)" />
+
+    <div class="data-controls-bar">
+      <button class="btn btn--ghost btn--sm" [disabled]="adminBusy()" (click)="downloadData()">
+        📥 Download My Data
+      </button>
+      <button class="btn btn--ghost btn--sm" [disabled]="adminBusy()" (click)="fileInput.click()">
+        📂 Load Data from File
+      </button>
+      <button class="btn btn--ghost btn--sm" [disabled]="adminBusy()" (click)="confirmSeed()">
+        🌱 Seed Sample Data
+      </button>
+      <button class="btn btn--ghost-danger btn--sm" [disabled]="adminBusy()" (click)="confirmReset()">
+        🗑️ Reset App
+      </button>
+    </div>
+
     <!-- Cancel confirmation modal -->
     @if (showCancelModal()) {
       <div class="modal-overlay" (click)="showCancelModal.set(false)">
@@ -100,6 +121,49 @@ interface ActionCard {
             <button class="btn btn--secondary" (click)="showCancelModal.set(false)">Keep Planning</button>
             <button class="btn btn--danger-solid" [disabled]="cancelling()" (click)="cancelPlan()">
               @if (cancelling()) { <span class="spinner"></span> } @else { Yes, Erase Everything }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Seed confirmation modal -->
+    @if (showSeedModal()) {
+      <div class="modal-overlay" (click)="showSeedModal.set(false)">
+        <div class="modal-box" (click)="$event.stopPropagation()">
+          <h3>🌱 Seed Sample Data?</h3>
+          <p style="color: var(--text-secondary); margin: var(--space-md) 0;">
+            This will <strong>clear all existing data</strong> and populate the app with realistic sample
+            team members and backlog items matching the demo application. You will be logged out.
+          </p>
+          <div class="flex gap-md justify-end" style="margin-top: var(--space-lg);">
+            <button class="btn btn--secondary" (click)="showSeedModal.set(false)">Cancel</button>
+            <button class="btn btn--primary" [disabled]="adminBusy()" (click)="seedData()">
+              @if (adminBusy()) { <span class="spinner"></span> } @else { Yes, Seed Data }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Reset confirmation modal -->
+    @if (showResetModal()) {
+      <div class="modal-overlay" (click)="showResetModal.set(false)">
+        <div class="modal-box" (click)="$event.stopPropagation()">
+          <h3 style="color: var(--status-error);">⚠️ Reset the Entire App?</h3>
+          <p style="color: var(--text-secondary); margin: var(--space-md) 0;">
+            This will <strong>permanently delete ALL data</strong> — users, backlog items, all plans and tasks.
+            The app will return to the initial onboarding screen. <strong>This cannot be undone.</strong>
+          </p>
+          <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;">
+            <p style="margin:0; font-size:0.85rem; color:#f87171;">Type <strong>RESET</strong> to confirm:</p>
+            <input class="form-control" style="margin-top:0.5rem;" [(ngModel)]="resetConfirmText"
+              placeholder="RESET" />
+          </div>
+          <div class="flex gap-md justify-end">
+            <button class="btn btn--secondary" (click)="showResetModal.set(false)">Cancel</button>
+            <button class="btn btn--danger-solid" [disabled]="adminBusy() || resetConfirmText !== 'RESET'" (click)="resetApp()">
+              @if (adminBusy()) { <span class="spinner"></span> } @else { Permanently Reset }
             </button>
           </div>
         </div>
@@ -185,6 +249,30 @@ interface ActionCard {
       &:hover:not(:disabled) { background: #dc2626; }
     }
 
+    .btn--ghost {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 0.78rem; padding: 0.4rem 0.85rem;
+      border-radius: var(--border-radius); cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+      &:hover:not(:disabled) { background: var(--bg-card); color: var(--text-primary); border-color: var(--accent); }
+      &:disabled { opacity: 0.4; cursor: not-allowed; }
+    }
+    .btn--ghost-danger {
+      background: transparent; border: 1px solid rgba(239,68,68,0.3);
+      color: #f87171; font-size: 0.78rem; padding: 0.4rem 0.85rem;
+      border-radius: var(--border-radius); cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+      &:hover:not(:disabled) { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.6); }
+      &:disabled { opacity: 0.4; cursor: not-allowed; }
+    }
+    .data-controls-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; justify-content: center; gap: var(--space-sm); flex-wrap: wrap;
+      padding: 0.6rem 1rem;
+      background: var(--bg-card); border-top: 1px solid var(--border);
+      z-index: 100;
+    }
+
     @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(10px); }
@@ -202,6 +290,12 @@ export class HomeComponent implements OnInit {
   readonly loading = signal(true);
   readonly showCancelModal = signal(false);
   readonly cancelling = signal(false);
+
+  // Data management
+  readonly adminBusy = signal(false);
+  readonly showSeedModal = signal(false);
+  readonly showResetModal = signal(false);
+  resetConfirmText = '';
 
   ngOnInit(): void {
     if (!this.auth.currentUser()) {
@@ -275,5 +369,86 @@ export class HomeComponent implements OnInit {
 
   formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  }
+
+  // ── Data Management ──────────────────────────────────────────────────────
+
+  downloadData(): void {
+    this.adminBusy.set(true);
+    this.api.exportData().subscribe({
+      next: (data) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `weekly-planner-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.adminBusy.set(false);
+        this.toast.success('Data downloaded successfully! 📥');
+      },
+      error: () => { this.adminBusy.set(false); this.toast.error('Export failed.'); }
+    });
+  }
+
+  onFileSelected(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        this.adminBusy.set(true);
+        this.api.importData(data).subscribe({
+          next: () => {
+            this.adminBusy.set(false);
+            this.toast.success('Data loaded successfully! The app will reload.');
+            this.auth.clearUser();
+            setTimeout(() => this.router.navigate(['/onboarding']), 800);
+          },
+          error: (err) => {
+            this.adminBusy.set(false);
+            this.toast.error(err.error?.detail ?? 'Import failed. Check the file format.');
+          }
+        });
+      } catch {
+        this.toast.error('Invalid JSON file. Please select a valid backup file.');
+      }
+      // Reset file input so same file can be loaded again
+      (event.target as HTMLInputElement).value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  confirmSeed(): void { this.showSeedModal.set(true); }
+  confirmReset(): void { this.resetConfirmText = ''; this.showResetModal.set(true); }
+
+  seedData(): void {
+    this.adminBusy.set(true);
+    this.api.seedSampleData().subscribe({
+      next: () => {
+        this.adminBusy.set(false);
+        this.showSeedModal.set(false);
+        this.toast.success('Sample data seeded! 🌱 Redirecting to onboarding...');
+        this.auth.clearUser();
+        setTimeout(() => this.router.navigate(['/onboarding']), 800);
+      },
+      error: () => { this.adminBusy.set(false); this.toast.error('Seed failed.'); }
+    });
+  }
+
+  resetApp(): void {
+    if (this.resetConfirmText !== 'RESET') return;
+    this.adminBusy.set(true);
+    this.api.resetApp().subscribe({
+      next: () => {
+        this.adminBusy.set(false);
+        this.showResetModal.set(false);
+        this.toast.success('App reset! All data cleared. Redirecting to onboarding...');
+        this.auth.clearUser();
+        setTimeout(() => this.router.navigate(['/onboarding']), 800);
+      },
+      error: () => { this.adminBusy.set(false); this.toast.error('Reset failed.'); }
+    });
   }
 }
