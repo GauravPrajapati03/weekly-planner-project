@@ -8,6 +8,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WeeklyPlanner.Application\WeeklyPlanner.Application.csproj" />
+    <ProjectReference Include="..\WeeklyPlanner.Infrastructure\WeeklyPlanner.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.14">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
