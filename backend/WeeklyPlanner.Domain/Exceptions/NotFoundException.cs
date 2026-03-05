@@ -6,6 +6,6 @@ namespace WeeklyPlanner.Domain.Exceptions;
 /// </summary>
 public class NotFoundException : DomainException
 {
-    public NotFoundException(string entityName, int id)
+    public NotFoundException(string entityName, object id)
         : base($"{entityName} with ID {id} was not found.") { }
 }

@@ -16,16 +16,16 @@ namespace WeeklyPlanner.Domain.Entities;
 /// </summary>
 public class WeeklyPlanTask
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>The weekly plan this task belongs to.</summary>
-    public int WeeklyPlanId { get; set; }
+    public Guid WeeklyPlanId { get; set; }
 
     /// <summary>The backlog item being worked on.</summary>
-    public int BacklogItemId { get; set; }
+    public Guid BacklogItemId { get; set; }
 
     /// <summary>The team member responsible for this task.</summary>
-    public int AssignedUserId { get; set; }
+    public Guid AssignedUserId { get; set; }
 
     /// <summary>
     /// Number of hours this user commits to spending on this task during the week.
