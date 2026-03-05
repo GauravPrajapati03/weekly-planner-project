@@ -4,15 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
-import { WeeklyPlanTask, CATEGORY_LABELS, CATEGORY_BADGE_CLASS, CategoryType, WorkItemStatus } from '../../core/models/models';
+import { WeeklyPlan, WeeklyPlanTask, CATEGORY_LABELS, CATEGORY_BADGE_CLASS, CategoryType, WorkItemStatus } from '../../core/models/models';
 import { NavbarComponent } from '../../shared/navbar/navbar.component';
+import { Router } from '@angular/router';
 
-interface EditableTask extends WeeklyPlanTask {
-  editedHours: number;
-  editedStatus: WorkItemStatus;
-}
-
-// Human-readable status labels
 const STATUS_LABELS: Record<WorkItemStatus, string> = {
   NotStarted: 'Not Started',
   InProgress: 'In Progress',
@@ -20,12 +15,11 @@ const STATUS_LABELS: Record<WorkItemStatus, string> = {
   Blocked: 'Blocked',
 };
 
-// Valid target statuses from a given current status
 function getAllowedNextStatuses(current: WorkItemStatus): WorkItemStatus[] {
   switch (current) {
     case 'NotStarted': return ['NotStarted', 'InProgress', 'Blocked'];
     case 'InProgress': return ['InProgress', 'Completed', 'Blocked'];
-    case 'Completed': return ['Completed']; // Terminal
+    case 'Completed': return ['Completed', 'InProgress'];  // allow going back per demo app
     case 'Blocked': return ['Blocked', 'InProgress'];
     default: return ['NotStarted', 'InProgress', 'Completed', 'Blocked'];
   }
@@ -39,192 +33,223 @@ function getAllowedNextStatuses(current: WorkItemStatus): WorkItemStatus[] {
     <app-navbar />
     <div class="page">
       <div class="container">
-        <div class="flex items-center gap-sm mb-md">
-          <h2 style="margin:0;">✏️ Update My Progress</h2>
-        </div>
+        <button class="btn btn--ghost btn--sm mb-sm" (click)="router.navigate(['/home'])">← Home</button>
+        <h2 class="mb-sm">Update My Progress</h2>
 
         @if (loading()) {
           <div class="text-center mt-xl"><div class="spinner"></div></div>
         } @else if (tasks().length === 0) {
-          <div class="alert alert--warning">No tasks assigned to you in the current plan. Ask your Team Lead to freeze the plan first.</div>
+          <div class="alert alert--warning">No tasks assigned to you. Ask your Team Lead to freeze the plan first.</div>
         } @else {
 
-          <!-- ── Header Stats ─────────────────────────────────────────── -->
-          <div class="stats-row mb-lg">
-            <div class="stat-chip">
-              <span class="stat-chip__label">Committed</span>
-              <span class="stat-chip__value">{{ totalCommitted() }}h</span>
-            </div>
-            <div class="stat-chip">
-              <span class="stat-chip__label">Overall Progress</span>
-              <span class="stat-chip__value accent">{{ overallProgress() }}%</span>
-            </div>
-            <div class="stat-chip">
-              <span class="stat-chip__label">Tasks Done</span>
-              <span class="stat-chip__value success">{{ tasksDone() }}</span>
-            </div>
-            <div class="stat-chip">
-              <span class="stat-chip__label">Blocked</span>
-              <span class="stat-chip__value {{ tasksBlocked() > 0 ? 'danger' : '' }}">{{ tasksBlocked() }}</span>
-            </div>
-          </div>
+          <!-- Subtitle: week info -->
+          <p class="week-meta mb-md">
+            Week of {{ formatDate(plan()?.weekEndDate) }}. Your plan: {{ totalCommitted() }} hours.
+          </p>
 
-          <!-- ── Overall progress bar ──────────────────────────────────── -->
-          <div class="card mb-lg" style="padding: var(--space-md) var(--space-lg);">
-            <div class="flex items-center justify-between mb-md">
-              <span class="text-sm text-secondary">{{ totalCompleted() }}h completed of {{ totalCommitted() }}h committed</span>
-              <span class="text-sm font-bold" style="color:var(--accent);">{{ overallProgress() }}%</span>
+          <!-- Overview progress bar -->
+          <div class="overview-bar card mb-lg">
+            <div class="overview-bar__text">
+              You've completed <strong>{{ totalCompleted() }} of {{ totalCommitted() }} hours</strong>
+              ({{ overallProgress() }}%)
             </div>
-            <div class="progress-bar-wrap" style="height:10px;">
+            <div class="progress-bar-wrap mt-md" style="height:10px;">
               <div class="progress-bar-fill" [style.width.%]="overallProgress()"></div>
             </div>
           </div>
 
-          <!-- ── Tasks table ────────────────────────────────────────────── -->
-          <div class="card" style="padding:0; overflow:hidden;">
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Task</th>
-                    <th>Category</th>
-                    <th style="text-align:right;">Planned</th>
-                    <th style="text-align:right; min-width:110px;">Hours Done</th>
-                    <th style="min-width:160px;">Status</th>
-                    <th style="min-width:120px;">Progress</th>
-                    <th style="text-align:right;">Save</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (task of tasks(); track task.id; let i = $index) {
-                    <tr [class.row--overrun]="task.editedHours > task.plannedHours"
-                        [class.row--done]="task.editedStatus === 'Completed'">
-                      <td><strong>{{ task.backlogItemTitle }}</strong></td>
-                      <td><span class="badge {{ catClass(task.category) }}">{{ catLabel(task.category) }}</span></td>
-                      <td style="text-align:right; white-space:nowrap;">{{ task.plannedHours }}h</td>
-                      <td style="text-align:right;">
-                        <input type="number" class="form-control hours-input"
-                          [(ngModel)]="task.editedHours"
-                          min="0" step="0.5" />
-                      </td>
-                      <td>
-                        <select class="form-control status-select"
-                          [(ngModel)]="task.editedStatus">
-                          @for (s of allowedStatuses(task.status); track s) {
-                            <option [value]="s">{{ statusLabel(s) }}</option>
-                          }
-                        </select>
-                      </td>
-                      <td style="min-width: 120px;">
-                        <div class="progress-bar-wrap">
-                          <div class="progress-bar-fill"
-                            [style.width.%]="Math.min(task.plannedHours > 0 ? (task.editedHours / task.plannedHours * 100) : 0, 100)"
-                            [class.fill--overrun]="task.editedHours > task.plannedHours">
-                          </div>
-                        </div>
-                        <div class="text-sm text-secondary" style="margin-top:4px; font-size:0.75rem;">
-                          {{ task.plannedHours > 0 ? (task.editedHours / task.plannedHours * 100).toFixed(0) : 0 }}%
-                        </div>
-                      </td>
-                      <td style="text-align:right;">
-                        <button class="btn btn--success btn--sm"
-                          [disabled]="saving()[i]"
-                          (click)="save(task, i)">
-                          @if (saving()[i]) { <span class="spinner"></span> } @else { Save }
-                        </button>
-                      </td>
-                    </tr>
+          <!-- Task rows — one card per task -->
+          <div class="task-list">
+            @for (task of tasks(); track task.id) {
+              <div class="task-card" [class.task-card--overrun]="task.completedHours > task.plannedHours">
+                <div class="task-card__left">
+                  <span class="task-title">{{ task.backlogItemTitle }}</span>
+                  <span class="badge {{ catClass(task.category) }} badge--sm">{{ catLabel(task.category) }}</span>
+                  <span class="status-pill status-pill--{{ task.status.toLowerCase() }}">{{ statusLabel(task.status) }}</span>
+                </div>
+                <div class="task-card__right">
+                  <span class="task-progress-text">
+                    {{ task.completedHours }} of {{ task.plannedHours }}h done
+                  </span>
+                  <div class="task-bar-wrap">
+                    <div class="task-bar-fill"
+                      [style.width.%]="task.plannedHours > 0 ? Math.min(task.completedHours / task.plannedHours * 100, 100) : 0"
+                      [class.fill--overrun]="task.completedHours > task.plannedHours">
+                    </div>
+                  </div>
+                  <button class="btn btn--primary btn--sm" (click)="openModal(task)">
+                    Update This Task
+                  </button>
+                </div>
 
-                    <!-- Overrun warning row -->
-                    @if (task.editedHours > task.plannedHours) {
-                      <tr class="overrun-warning-row">
-                        <td colspan="7">
-                          <div class="overrun-banner">
-                            ⚠️ You've put in more hours than you planned (<strong>{{ task.editedHours }}h</strong> vs <strong>{{ task.plannedHours }}h</strong> planned). That's okay — this will be noted.
-                          </div>
-                        </td>
-                      </tr>
-                    }
-                  }
-                </tbody>
-              </table>
-            </div>
+                <!-- Overrun warning -->
+                @if (task.completedHours > task.plannedHours) {
+                  <div class="overrun-banner">
+                    ⚠️ You've put in more hours than planned ({{ task.completedHours }}h vs {{ task.plannedHours }}h committed). That's okay — this will be noted.
+                  </div>
+                }
+              </div>
+            }
           </div>
         }
       </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- Modal: Update This Task                        -->
+    <!-- ═══════════════════════════════════════════════ -->
+    @if (editingTask()) {
+      <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-box" (click)="$event.stopPropagation()" style="max-width:500px;">
+          <div class="modal-header">
+            <h3>Update: {{ editingTask()!.backlogItemTitle }}</h3>
+            <button class="btn btn--ghost btn--sm" (click)="closeModal()">✕</button>
+          </div>
+
+          <p class="modal-sub mb-lg">
+            Committed: {{ editingTask()!.plannedHours }}h. Currently: {{ editingTask()!.completedHours }}h done.
+          </p>
+
+          <!-- Hours completed -->
+          <div class="form-group mb-md">
+            <label class="form-label">Hours completed</label>
+            <input type="number" class="form-control"
+              [(ngModel)]="editHours"
+              min="0" step="0.5"
+              placeholder="0" />
+          </div>
+
+          <!-- Status -->
+          <div class="form-group mb-md">
+            <label class="form-label">Status</label>
+            <select class="form-control" [(ngModel)]="editStatus">
+              @for (s of allowedStatuses(editingTask()!.status); track s) {
+                <option [value]="s">{{ statusLabel(s) }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Note (optional) -->
+          <div class="form-group mb-lg">
+            <label class="form-label">Note (optional)</label>
+            <textarea class="form-control" rows="3"
+              [(ngModel)]="editNote"
+              placeholder="Add a note about this task"></textarea>
+          </div>
+
+          <!-- Overrun warning in modal -->
+          @if (editHours > editingTask()!.plannedHours) {
+            <div class="overrun-banner mb-md">
+              ⚠️ You've entered more hours than planned ({{ editHours }}h vs {{ editingTask()!.plannedHours }}h committed). That's okay.
+            </div>
+          }
+
+          <div class="flex gap-sm">
+            <button class="btn btn--primary" [disabled]="saving()" (click)="saveModal()">
+              @if (saving()) { <span class="spinner"></span> } @else { Save Progress }
+            </button>
+            <button class="btn btn--secondary" (click)="closeModal()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
-    .stats-row {
-      display: flex; gap: var(--space-md); flex-wrap: wrap;
-    }
-    .stat-chip {
+    .week-meta { color: var(--text-secondary); font-size: 0.88rem; }
+
+    /* Overview bar */
+    .overview-bar { padding: var(--space-md) var(--space-lg); }
+    .overview-bar__text { font-size: 0.95rem; color: var(--text-secondary); }
+    .overview-bar__text strong { color: var(--text-primary); }
+
+    /* Task list */
+    .task-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+    /* Task card */
+    .task-card {
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--border-radius-lg);
       padding: var(--space-md) var(--space-lg);
-      display: flex; flex-direction: column; gap: 4px; min-width: 130px;
+      display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-md);
     }
-    .stat-chip__label { font-size: 0.73rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-    .stat-chip__value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
-    .stat-chip__value.accent  { color: var(--accent); }
-    .stat-chip__value.success { color: var(--status-success); }
-    .stat-chip__value.danger  { color: var(--status-error); }
+    .task-card--overrun { border-color: rgba(234,179,8,0.4); }
 
-    .hours-input  { width: 72px; text-align: right; padding: 0.35rem 0.5rem; font-size: 0.85rem; }
-    .status-select { width: 140px; padding: 0.35rem 0.5rem; font-size: 0.82rem; }
+    .task-card__left {
+      display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); flex: 1; min-width: 200px;
+    }
+    .task-title { font-weight: 700; font-size: 0.95rem; }
 
-    .row--overrun td { background: rgba(234,179,8,0.04); }
-    .row--done   td { opacity: 0.75; }
+    .task-card__right {
+      display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap;
+    }
+    .task-progress-text { font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
+    .task-bar-wrap {
+      width: 120px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden;
+    }
+    .task-bar-fill {
+      height: 100%; background: var(--accent, #3498db); border-radius: 999px; transition: width 0.3s ease;
+    }
+    .fill--overrun { background: #eab308 !important; }
 
-    .fill--overrun { background: var(--status-warning, #eab308) !important; }
-
-    .overrun-warning-row td { padding: 0 !important; border-top: none !important; }
+    /* Overrun banner — spans full width inside card */
     .overrun-banner {
-      background: rgba(234,179,8,0.12);
-      border-left: 3px solid #eab308;
-      padding: 0.5rem 1rem;
-      font-size: 0.82rem;
-      color: #fbbf24;
+      width: 100%; flex-basis: 100%;
+      background: rgba(234,179,8,0.12); border-left: 3px solid #eab308;
+      padding: 8px 12px; font-size: 0.82rem; color: #fbbf24; border-radius: 4px;
     }
+
+    /* Status pills */
+    .status-pill {
+      padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+    }
+    .status-pill--notstarted  { background: rgba(127,140,141,0.2); color: #7f8c8d; }
+    .status-pill--inprogress  { background: rgba(52,152,219,0.2);  color: #3498db; }
+    .status-pill--completed   { background: rgba(39,174,96,0.2);   color: #27ae60; }
+    .status-pill--blocked     { background: rgba(231,76,60,0.2);   color: #e74c3c; }
+
+    /* Badge small size */
+    .badge--sm { font-size: 0.72rem; }
+
+    /* Modal sub-text */
+    .modal-sub { font-size: 0.88rem; color: var(--text-secondary); }
   `]
 })
 export class UpdateProgressComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
-
+  readonly router = inject(Router);
   readonly Math = Math;
+
   readonly loading = signal(true);
-  readonly tasks = signal<EditableTask[]>([]);
-  readonly saving = signal<boolean[]>([]);
+  readonly saving = signal(false);
+  readonly tasks = signal<WeeklyPlanTask[]>([]);
+  readonly plan = signal<WeeklyPlan | null>(null);
+
+  /** The task currently being edited in the modal */
+  readonly editingTask = signal<WeeklyPlanTask | null>(null);
+  editHours = 0;
+  editStatus: WorkItemStatus = 'NotStarted';
+  editNote = '';
 
   planId = '';
 
-  // Computed stats — reactive, no refresh needed
+  // ── Computed totals ────────────────────────────────────────────────────
   readonly totalCommitted = computed(() => this.tasks().reduce((s, t) => s + t.plannedHours, 0));
-  readonly totalCompleted = computed(() => this.tasks().reduce((s, t) => s + t.editedHours, 0));
+  readonly totalCompleted = computed(() => this.tasks().reduce((s, t) => s + t.completedHours, 0));
   readonly overallProgress = computed(() => {
     const c = this.totalCommitted();
     return c > 0 ? Math.round(this.totalCompleted() / c * 100) : 0;
   });
-  readonly tasksDone = computed(() => this.tasks().filter(t => t.editedStatus === 'Completed').length);
-  readonly tasksBlocked = computed(() => this.tasks().filter(t => t.editedStatus === 'Blocked').length);
 
   ngOnInit(): void {
     this.api.getActivePlan().subscribe({
-      next: (plan) => {
-        if (!plan) { this.loading.set(false); return; }
-        this.planId = plan.id;
-        this.api.getTasksByUser(plan.id, this.auth.currentUser()!.id).subscribe({
-          next: (ts) => {
-            this.tasks.set(ts.map(t => ({
-              ...t,
-              editedHours: t.completedHours,
-              editedStatus: t.status
-            })));
-            this.saving.set(ts.map(() => false));
-            this.loading.set(false);
-          },
+      next: (p) => {
+        if (!p) { this.loading.set(false); return; }
+        this.plan.set(p);
+        this.planId = p.id;
+        this.api.getTasksByUser(p.id, this.auth.currentUser()!.id).subscribe({
+          next: (ts) => { this.tasks.set(ts); this.loading.set(false); },
           error: () => this.loading.set(false)
         });
       },
@@ -232,38 +257,58 @@ export class UpdateProgressComponent implements OnInit {
     });
   }
 
-  save(task: EditableTask, index: number): void {
-    if (task.editedHours < 0) {
-      this.toast.error('Hours cannot be negative.');
-      return;
-    }
+  // ── Modal ──────────────────────────────────────────────────────────────
 
-    this.saving.update(arr => { const a = [...arr]; a[index] = true; return a; });
+  openModal(task: WeeklyPlanTask): void {
+    this.editingTask.set(task);
+    this.editHours = task.completedHours;
+    this.editStatus = task.status;
+    this.editNote = '';
+  }
 
+  closeModal(): void {
+    this.editingTask.set(null);
+  }
+
+  saveModal(): void {
+    const task = this.editingTask();
+    if (!task) return;
+    if (this.editHours < 0) { this.toast.error('Hours cannot be negative.'); return; }
+
+    this.saving.set(true);
     this.api.updateProgress(this.planId, {
       taskId: task.id,
-      completedHours: task.editedHours,
-      status: task.editedStatus
+      completedHours: this.editHours,
+      status: this.editStatus
     }).subscribe({
       next: () => {
-        // Update local state reactively — no page refresh needed
-        this.tasks.update(list => list.map((t, i) =>
-          i === index
-            ? { ...t, completedHours: task.editedHours, status: task.editedStatus }
+        // Update local task list reactively
+        this.tasks.update(list => list.map(t =>
+          t.id === task.id
+            ? { ...t, completedHours: this.editHours, status: this.editStatus }
             : t
         ));
-        this.saving.update(arr => { const a = [...arr]; a[index] = false; return a; });
+        this.saving.set(false);
         this.toast.success(`"${task.backlogItemTitle}" progress saved!`);
+        this.closeModal();
       },
       error: (err) => {
-        this.saving.update(arr => { const a = [...arr]; a[index] = false; return a; });
+        this.saving.set(false);
         this.toast.error(err.error?.detail ?? 'Failed to save progress.');
       }
     });
   }
 
+  // ── Helpers ────────────────────────────────────────────────────────────
+
   allowedStatuses(current: WorkItemStatus): WorkItemStatus[] {
     return getAllowedNextStatuses(current);
+  }
+
+  formatDate(dateStr: string | undefined): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   statusLabel(s: WorkItemStatus): string { return STATUS_LABELS[s] ?? s; }
