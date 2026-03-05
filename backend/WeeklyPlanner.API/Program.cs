@@ -41,14 +41,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorNumbersToAdd: new[] { 40613, 40197, 40501, 49918 })));
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-// Allow Angular dev server (port 4200) and the deployed Azure Static Web App URL.
+// Allow:
+//   • Angular dev server (localhost:4200)
+//   • Any Azure Static Web Apps origin (*.azurestaticapps.net — covers
+//     production + PR preview slots like jolly-flower-0c7507b00.1.azurestaticapps.net)
+//   • Any extra origin set in AllowedOrigins config
+var extraOrigin = builder.Configuration["AllowedOrigins"] ?? "";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
         policy
-            .WithOrigins(
-                "http://localhost:4200",
-                builder.Configuration["AllowedOrigins"] ?? "")
+            .SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrEmpty(origin)) return false;
+                var uri = new Uri(origin);
+                return uri.Host == "localhost"
+                    || uri.Host.EndsWith(".azurestaticapps.net")
+                    || (!string.IsNullOrEmpty(extraOrigin) && origin == extraOrigin);
+            })
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
