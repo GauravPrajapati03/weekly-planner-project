@@ -56,8 +56,7 @@ public class DashboardService : IDashboardService
                 var catProgress  = catPlanned > 0 ? Math.Round(catCompleted / catPlanned * 100, 1) : 0;
                 return new CategoryProgressDto(cat.ToString(), catPlanned, catCompleted, catProgress);
             })
-            .Where(c => c.PlannedHours > 0)
-            .ToList();
+            .ToList(); // always return all 3 categories — even with 0h planned
 
         var userBreakdown = tasks
             .GroupBy(t => t.AssignedUserId)

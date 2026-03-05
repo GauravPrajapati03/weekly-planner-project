@@ -320,16 +320,12 @@ export class ReviewFreezeComponent implements OnInit {
     const allUsers = this.allUsers();
     if (!p || !allUsers.length) return [];
 
-    // Determine which users should appear:
-    // If the plan has selectedMemberIds (new plans), filter to only those users.
-    // For old plans (no selectedMemberIds), fall back to all users in the dashboard + all active users.
     let selectedUsers: User[];
     const selectedIds = p.selectedMemberIds ?? [];
     if (selectedIds.length > 0) {
       const selectedSet = new Set(selectedIds);
       selectedUsers = allUsers.filter(u => selectedSet.has(u.id));
     } else {
-      // Fallback: use totalTeamHours / 30 to infer count and use dashboard users + remaining active users
       selectedUsers = allUsers;
     }
 
@@ -337,11 +333,14 @@ export class ReviewFreezeComponent implements OnInit {
 
     return selectedUsers.map(user => {
       const userData = taskMap.get(user.id);
+      const submitKey = `plan-submit-${p.id}-${user.id}`;
+      const isSubmitted = localStorage.getItem(submitKey) === 'true';
+      const hoursPlanned = userData?.plannedHours ?? 0;
       return {
         userId: user.id,
         userName: user.name,
-        hoursPlanned: userData?.plannedHours ?? 0,
-        ready: (userData?.plannedHours ?? 0) >= 30,
+        hoursPlanned,
+        ready: isSubmitted,           // READY badge = only if they clicked the button
         tasks: (userData?.tasks ?? []).map(t => ({
           title: t.backlogItemTitle,
           category: t.category as CategoryType,
@@ -373,8 +372,10 @@ export class ReviewFreezeComponent implements OnInit {
 
   unmetConditions(): string[] {
     const msgs: string[] = [];
+    // Freeze condition: every member must have exactly 30h planned
     for (const m of this.memberRows()) {
-      if (!m.ready) msgs.push(`${m.userName} has ${m.hoursPlanned} hours (needs ${30 - m.hoursPlanned} more).`);
+      if (m.hoursPlanned < 30)
+        msgs.push(`${m.userName} has ${m.hoursPlanned}h planned (needs ${30 - m.hoursPlanned} more).`);
     }
     for (const cat of this.categoryRows()) {
       if (!cat.ok) {

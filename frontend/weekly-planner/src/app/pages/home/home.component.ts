@@ -337,10 +337,9 @@ export class HomeComponent implements OnInit {
     // === Frozen status ===
     if (status === 'Frozen') {
       if (isLead) {
-        // Lead frozen home — matches demo app screenshot 4
         cards.push({ title: 'See Team Progress', description: 'Check how the team is doing.', icon: '📊', route: '/week/team-progress', style: 'primary' });
         cards.push({ title: 'Update My Progress', description: 'Report hours and status on your tasks.', icon: '✏️', route: '/week/progress', style: 'success' });
-        cards.push({ title: 'Finish This Week', description: 'Close out this cycle.', icon: '✅', route: '/week/complete', style: 'success' });
+        cards.push({ title: 'Finish This Week', description: 'Close out this cycle.', icon: '✅', route: '/week/team-progress', style: 'success' });
         cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
         cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
         cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });

@@ -183,6 +183,7 @@ public class WeeklyPlanService : IWeeklyPlanService
             {
                 (WorkItemStatus.NotStarted, WorkItemStatus.InProgress)  => true,
                 (WorkItemStatus.InProgress, WorkItemStatus.Completed)   => true,
+                (WorkItemStatus.Completed,  WorkItemStatus.InProgress)  => true,  // allow reverting per demo app
                 (WorkItemStatus.NotStarted, WorkItemStatus.Completed)   => false,
                 (_, WorkItemStatus.Blocked)                             => true,
                 (WorkItemStatus.Blocked, WorkItemStatus.InProgress)     => true,

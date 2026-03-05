@@ -62,7 +62,9 @@ type View = 'plan' | 'backlog-list';
 
             <!-- Action buttons -->
             <div class="action-row mb-lg">
-              <button class="btn btn--primary" (click)="view.set('backlog-list')">
+              <button class="btn btn--primary"
+                [disabled]="claimedHours() >= 30"
+                (click)="view.set('backlog-list')">
                 Add Work from Backlog
               </button>
               @if (!donePlanning()) {
@@ -139,13 +141,18 @@ type View = 'plan' | 'backlog-list';
             @for (item of availableBacklog(); track item.id) {
               <div class="backlog-row card">
                 <div class="backlog-row__info">
-                  <strong>{{ item.title }}</strong>
-                  <span class="badge {{ catClass(item.category) }}" style="margin: 0 var(--space-sm);">
-                    {{ catLabel(item.category) }}
-                  </span>
-                  @if (item.estimatedHours) {
-                    <span class="est-hours">{{ item.estimatedHours }}h est.</span>
-                  }
+                  <div class="backlog-row__title">
+                    <strong>{{ item.title }}</strong>
+                    <span class="badge {{ catClass(item.category) }}" style="margin: 0 var(--space-sm);">
+                      {{ catLabel(item.category) }}
+                    </span>
+                    @if (item.estimatedHours) {
+                      <span class="est-hours">{{ formatHours(item.estimatedHours) }} est.</span>
+                    }
+                    @if (isPickedByTeam(item.id)) {
+                      <span class="picked-badge">Someone picked this</span>
+                    }
+                  </div>
                   @if (item.description) {
                     <p class="text-secondary text-sm mt-md" style="margin: 4px 0 0;">{{ item.description }}</p>
                   }
@@ -180,15 +187,15 @@ type View = 'plan' | 'backlog-list';
               </span>
             </div>
             <div class="pick-meta">
-              <span>Your hours left: <strong>{{ 30 - claimedHours() }}</strong></span>
-              <span>{{ catLabel(pickingItem()!.category) }} budget left: <strong>{{ catBudgetLeft(pickingItem()!.category) }}h</strong></span>
+              <span>Your hours left: <strong>{{ formatHours(30 - claimedHours()) }}</strong></span>
+              <span>{{ catLabel(pickingItem()!.category) }} budget left: <strong>{{ formatHours(catBudgetLeft(pickingItem()!.category)) }}h</strong></span>
               @if (pickingItem()!.estimatedHours) {
-                <span>Estimate for this item: <strong>{{ pickingItem()!.estimatedHours }}h</strong>. You can enter any amount.</span>
+                <span>Estimate for this item: <strong>{{ formatHours(pickingItem()!.estimatedHours!) }}h</strong>. You can enter any amount.</span>
               }
             </div>
           </div>
 
-          <div class="form-group mb-lg">
+          <div class="form-group mb-md">
             <label class="form-label">Hours to commit</label>
             <input type="number" class="form-control"
               [(ngModel)]="pickHours"
@@ -196,8 +203,13 @@ type View = 'plan' | 'backlog-list';
               placeholder="0" />
           </div>
 
+          <!-- Inline validation error -->
+          @if (pickValidationError()) {
+            <p class="pick-error mb-md">{{ pickValidationError() }}</p>
+          }
+
           <button class="btn btn--primary" style="width:100%;"
-            [disabled]="!pickHours || pickHours <= 0 || saving()"
+            [disabled]="!pickHours || pickHours <= 0 || !!pickValidationError() || saving()"
             (click)="addToMyPlan()">
             @if (saving()) { <span class="spinner"></span>&nbsp;Adding... }
             @else { Add to My Plan }
@@ -308,6 +320,18 @@ type View = 'plan' | 'backlog-list';
     .pick-meta { display: flex; flex-direction: column; gap: 4px; font-size: 0.88rem; color: var(--text-secondary); }
     .pick-meta strong { color: var(--text-primary); }
 
+    .pick-error { color: #e74c3c; font-size: 0.85rem; font-weight: 600; }
+
+    /* 'Someone picked this' badge */
+    .picked-badge {
+      display: inline-block;
+      background: rgba(155,89,182,0.18); color: #9b59b6;
+      border: 1px solid rgba(155,89,182,0.4);
+      padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+      margin-left: 4px;
+    }
+    .backlog-row__title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+
     .btn--danger { background: var(--status-error, #e74c3c); color: #fff; }
     .btn--danger:hover { filter: brightness(1.1); }
   `]
@@ -337,11 +361,18 @@ export class PlanMyWorkComponent implements OnInit {
   readonly changingTask = signal<WeeklyPlanTask | null>(null);
   changeHoursVal = 0;
 
+  /** localStorage key for the submitted state: plan-submit-{planId}-{userId} */
+  private submitKey(planId: string): string {
+    return `plan-submit-${planId}-${this.auth.currentUser()?.id}`;
+  }
+
   ngOnInit(): void {
     this.api.getActivePlan().subscribe({
       next: (plan) => {
         this.activePlan.set(plan);
         if (plan) {
+          // Restore submitted state from localStorage
+          this.donePlanning.set(localStorage.getItem(this.submitKey(plan.id)) === 'true');
           this.loadMyTasks(plan.id);
           this.loadBacklog();
           this.loadTeamDashboard(plan.id);
@@ -445,6 +476,28 @@ export class PlanMyWorkComponent implements OnInit {
     return this.categoryCards().find(c => c.key === cat)?.left ?? 0;
   }
 
+  /** Format hours cleanly: whole numbers show as '15', decimals as '15.5' (no trailing zeros). */
+  formatHours(h: number | null | undefined): string {
+    if (h == null) return '0';
+    return Number.isInteger(h) ? String(h) : h.toFixed(1).replace(/\.0$/, '');
+  }
+
+  /** True if any team member already has this backlog item in their plan. */
+  isPickedByTeam(backlogItemId: string): boolean {
+    return (this.teamDashboard()?.tasks ?? []).some(t => t.backlogItemId === backlogItemId);
+  }
+
+  /** Inline validation message for the pick-hours modal. Empty string = no error. */
+  pickValidationError(): string {
+    const h = this.pickHours;
+    if (!h || h <= 0) return '';
+    const left = 30 - this.claimedHours();
+    if (h > left) {
+      return `Assigning ${this.formatHours(h)}h would exceed your 30-hour limit. You have ${this.formatHours(left)}h left.`;
+    }
+    return '';
+  }
+
   // ── Backlog picker ──────────────────────────────────────────────────────
 
   openPickModal(item: BacklogItem): void {
@@ -460,19 +513,21 @@ export class PlanMyWorkComponent implements OnInit {
   addToMyPlan(): void {
     const plan = this.activePlan()!;
     const item = this.pickingItem()!;
+    const hours = this.pickHours;    // capture BEFORE closePickModal resets to 0
+    const title = item.title;
     this.saving.set(true);
     this.api.assignTask(plan.id, {
       backlogItemId: item.id,
       assignedUserId: this.auth.currentUser()!.id,
-      plannedHours: this.pickHours
+      plannedHours: hours
     }).subscribe({
       next: (task) => {
         this.myTasks.update(ts => [...ts, task]);
         this.closePickModal();
         this.saving.set(false);
         this.view.set('plan');
-        this.toast.success(`Added! ${item.title} — ${this.pickHours}h`);
-        this.loadTeamDashboard(plan.id);  // refresh team-wide category claimed
+        this.toast.success(`Added! ${title} — ${this.formatHours(hours)}h`);
+        this.loadTeamDashboard(plan.id);
       },
       error: (err) => {
         this.toast.error(err.error?.detail ?? 'Failed to assign task.');
@@ -542,11 +597,15 @@ export class PlanMyWorkComponent implements OnInit {
   // ── I'm Done Planning ───────────────────────────────────────────────────
 
   markDone(): void {
+    const planId = this.activePlan()?.id;
+    if (planId) localStorage.setItem(this.submitKey(planId), 'true');
     this.donePlanning.set(true);
     this.toast.success("✅ You've marked yourself as done planning!");
   }
 
   undoDone(): void {
+    const planId = this.activePlan()?.id;
+    if (planId) localStorage.removeItem(this.submitKey(planId));
     this.donePlanning.set(false);
     this.toast.info("Marked as not done yet. You can continue planning.");
   }
