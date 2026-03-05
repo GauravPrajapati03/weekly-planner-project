@@ -14,7 +14,8 @@ on:
       - '.github/workflows/backend-ci-cd.yml'
 
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '9.0.x'          # .NET 9 SDK is required to support the .slnx solution format
+  SOLUTION_PATH: 'backend/WeeklyPlanner.slnx'
   PROJECT_PATH: 'backend/WeeklyPlanner.API/WeeklyPlanner.API.csproj'
   PUBLISH_DIR: '${{ github.workspace }}/publish'
 
@@ -36,20 +37,17 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore NuGet packages
-        run: dotnet restore ${{ env.PROJECT_PATH }}
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
-      - name: Build (Release)
-        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+      - name: Build full solution (Release)
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
 
-      - name: Run Tests
-        run: |
-          # Runs any test projects in the solution
-          dotnet test backend/ --configuration Release --no-build \
-            --verbosity normal \
-            --logger "trx;LogFileName=test-results.trx" \
-            2>/dev/null || echo "No test projects found — skipping"
+      # No dedicated test projects exist yet — skipping dotnet test.
+      # Add test projects here when ready:
+      # - name: Run Tests
+      #   run: dotnet test ${{ env.SOLUTION_PATH }} --configuration Release --no-build --verbosity normal
 
-      - name: Publish build artifact
+      - name: Publish API artifact
         run: |
           dotnet publish ${{ env.PROJECT_PATH }} \
             --configuration Release \

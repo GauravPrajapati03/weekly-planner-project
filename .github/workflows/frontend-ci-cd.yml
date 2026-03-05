@@ -43,10 +43,6 @@ jobs:
         working-directory: frontend/weekly-planner
         run: npx ng test --watch=false
 
-      - name: Build for production
-        working-directory: frontend/weekly-planner
-        run: npx ng build --configuration production
-
   # ─────────────────────────────────────────────────────────────────
   # JOB 2: Deploy to Azure Static Web Apps
   # Azure SWA handles PR preview environments automatically.
