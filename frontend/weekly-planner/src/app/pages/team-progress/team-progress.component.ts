@@ -8,10 +8,10 @@ import { Dashboard, CATEGORY_LABELS, CATEGORY_BADGE_CLASS, CategoryType } from '
 import { NavbarComponent } from '../../shared/navbar/navbar.component';
 
 @Component({
-    selector: 'app-team-progress',
-    standalone: true,
-    imports: [CommonModule, NavbarComponent],
-    template: `
+  selector: 'app-team-progress',
+  standalone: true,
+  imports: [CommonModule, NavbarComponent],
+  template: `
     <app-navbar />
     <div class="page">
       <div class="container">
@@ -131,7 +131,7 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
       </div>
     }
   `,
-    styles: [`
+  styles: [`
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); }
     @media (max-width: 600px) { .stats-grid { grid-template-columns: 1fr; } }
 
@@ -154,46 +154,46 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
   `]
 })
 export class TeamProgressComponent implements OnInit {
-    readonly auth = inject(AuthService);
-    private readonly api = inject(ApiService);
-    private readonly toast = inject(ToastService);
-    private readonly router = inject(Router);
+  readonly auth = inject(AuthService);
+  private readonly api = inject(ApiService);
+  private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
-    readonly loading = signal(true);
-    readonly completing = signal(false);
-    readonly dashboard = signal<Dashboard | null>(null);
-    readonly planId = signal(0);
+  readonly loading = signal(true);
+  readonly completing = signal(false);
+  readonly dashboard = signal<Dashboard | null>(null);
+  readonly planId = signal('');
 
-    confirmComplete = false;
+  confirmComplete = false;
 
-    ngOnInit(): void {
-        this.api.getActivePlan().subscribe({
-            next: (plan) => {
-                if (!plan) { this.loading.set(false); return; }
-                this.planId.set(plan.id);
-                this.api.getDashboard(plan.id).subscribe({
-                    next: (d) => { this.dashboard.set(d); this.loading.set(false); },
-                    error: () => this.loading.set(false)
-                });
-            }
+  ngOnInit(): void {
+    this.api.getActivePlan().subscribe({
+      next: (plan) => {
+        if (!plan) { this.loading.set(false); return; }
+        this.planId.set(plan.id);
+        this.api.getDashboard(plan.id).subscribe({
+          next: (d) => { this.dashboard.set(d); this.loading.set(false); },
+          error: () => this.loading.set(false)
         });
-    }
+      }
+    });
+  }
 
-    completeWeek(): void {
-        this.confirmComplete = false;
-        this.completing.set(true);
-        this.api.completePlan(this.planId()).subscribe({
-            next: () => {
-                this.toast.success('Week completed and archived! Great work team! 🎉');
-                this.router.navigate(['/home']);
-            },
-            error: (err) => {
-                this.toast.error(err.error?.detail ?? 'Failed to complete the week.');
-                this.completing.set(false);
-            }
-        });
-    }
+  completeWeek(): void {
+    this.confirmComplete = false;
+    this.completing.set(true);
+    this.api.completePlan(this.planId()).subscribe({
+      next: () => {
+        this.toast.success('Week completed and archived! Great work team! 🎉');
+        this.router.navigate(['/home']);
+      },
+      error: (err) => {
+        this.toast.error(err.error?.detail ?? 'Failed to complete the week.');
+        this.completing.set(false);
+      }
+    });
+  }
 
-    catLabel(cat: string): string { return CATEGORY_LABELS[cat as CategoryType] ?? cat; }
-    catClass(cat: string): string { return CATEGORY_BADGE_CLASS[cat as CategoryType] ?? ''; }
+  catLabel(cat: string): string { return CATEGORY_LABELS[cat as CategoryType] ?? cat; }
+  catClass(cat: string): string { return CATEGORY_BADGE_CLASS[cat as CategoryType] ?? ''; }
 }

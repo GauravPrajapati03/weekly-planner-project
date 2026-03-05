@@ -198,7 +198,7 @@ export class UpdateProgressComponent implements OnInit {
   readonly tasks = signal<EditableTask[]>([]);
   readonly saving = signal<boolean[]>([]);
 
-  planId = 0;
+  planId = '';
 
   // Computed stats — reactive, no refresh needed
   readonly totalCommitted = computed(() => this.tasks().reduce((s, t) => s + t.plannedHours, 0));
