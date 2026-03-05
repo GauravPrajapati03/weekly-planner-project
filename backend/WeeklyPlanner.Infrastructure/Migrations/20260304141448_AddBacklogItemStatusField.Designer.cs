@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WeeklyPlanner.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using WeeklyPlanner.Infrastructure.Data;
 namespace WeeklyPlanner.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260304141448_AddBacklogItemStatusField")]
+    partial class AddBacklogItemStatusField
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -111,10 +114,6 @@ namespace WeeklyPlanner.Infrastructure.Migrations
                         .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
 
-                    b.Property<string>("SelectedMemberIdsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -122,9 +121,6 @@ namespace WeeklyPlanner.Infrastructure.Migrations
                     b.Property<decimal>("TechDebtPercent")
                         .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
-
-                    b.Property<decimal>("TotalTeamHours")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("WeekEndDate")
                         .HasColumnType("datetime2");

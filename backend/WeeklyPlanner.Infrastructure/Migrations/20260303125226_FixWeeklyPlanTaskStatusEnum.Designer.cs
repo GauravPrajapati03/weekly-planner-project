@@ -12,8 +12,8 @@ using WeeklyPlanner.Infrastructure.Data;
 namespace WeeklyPlanner.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260303071832_AddEstimatedHoursToBacklogItem")]
-    partial class AddEstimatedHoursToBacklogItem
+    [Migration("20260303125226_FixWeeklyPlanTaskStatusEnum")]
+    partial class FixWeeklyPlanTaskStatusEnum
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,11 +27,9 @@ namespace WeeklyPlanner.Infrastructure.Migrations
 
             modelBuilder.Entity("WeeklyPlanner.Domain.Entities.BacklogItem", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -62,11 +60,9 @@ namespace WeeklyPlanner.Infrastructure.Migrations
 
             modelBuilder.Entity("WeeklyPlanner.Domain.Entities.User", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -91,11 +87,9 @@ namespace WeeklyPlanner.Infrastructure.Migrations
 
             modelBuilder.Entity("WeeklyPlanner.Domain.Entities.WeeklyPlan", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("ClientPercent")
                         .HasPrecision(5, 2)
@@ -135,17 +129,15 @@ namespace WeeklyPlanner.Infrastructure.Migrations
 
             modelBuilder.Entity("WeeklyPlanner.Domain.Entities.WeeklyPlanTask", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("uniqueidentifier");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<Guid>("AssignedUserId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("AssignedUserId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BacklogItemId")
-                        .HasColumnType("int");
+                    b.Property<Guid>("BacklogItemId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("CompletedHours")
                         .ValueGeneratedOnAdd()
@@ -157,8 +149,12 @@ namespace WeeklyPlanner.Infrastructure.Migrations
                         .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
 
-                    b.Property<int>("WeeklyPlanId")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("WeeklyPlanId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 

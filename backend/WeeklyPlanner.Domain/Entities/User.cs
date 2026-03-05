@@ -9,7 +9,7 @@ namespace WeeklyPlanner.Domain.Entities;
 /// </summary>
 public class User
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>Full display name of the user (e.g., "Alice Chen").</summary>
     public string Name { get; set; } = string.Empty;

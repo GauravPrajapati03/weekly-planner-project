@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
-import { User, UserRole } from '../../core/models/models';
+import { User } from '../../core/models/models';
 import { NavbarComponent } from '../../shared/navbar/navbar.component';
 
 @Component({
@@ -20,19 +20,13 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
         <!-- Add Member Form — always visible at top like the demo -->
         <div class="card mb-lg" style="border-left: 3px solid var(--accent);">
           <h4 class="mb-md">Add a New Member</h4>
+          <p class="text-sm text-secondary mb-md">New members join as Team Member. Use "Make Lead" below to transfer the lead role.</p>
           <div class="flex gap-md items-end" style="flex-wrap:wrap;">
             <div class="form-group" style="flex: 2; min-width: 200px; margin:0;">
               <label class="form-label">Name *</label>
               <input id="new-member-name" class="form-control" [(ngModel)]="newName"
                 placeholder="Type a name here"
                 (keyup.enter)="save()" />
-            </div>
-            <div class="form-group" style="flex: 1; min-width: 140px; margin:0;">
-              <label class="form-label">Role</label>
-              <select class="form-control" [(ngModel)]="newRole">
-                <option value="TeamMember">Team Member</option>
-                <option value="TeamLead">Team Lead</option>
-              </select>
             </div>
             <button class="btn btn--primary" style="height:44px;"
               [disabled]="saving()" (click)="save()">
@@ -64,7 +58,7 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
                       <input class="form-control" style="max-width:220px; padding:0.35rem 0.6rem;"
                         [(ngModel)]="editName"
                         (keyup.enter)="saveEdit(user)"
-                        (keyup.escape)="editingId.set(0)" />
+                        (keyup.escape)="editingId.set(null)" />
                     } @else {
                       <strong style="font-size:1rem;">{{ user.name }}</strong>
                     }
@@ -84,7 +78,7 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
                   @if (editingId() === user.id) {
                     <!-- editing state -->
                     <button class="btn btn--success btn--sm" (click)="saveEdit(user)">✓ Save</button>
-                    <button class="btn btn--secondary btn--sm" (click)="editingId.set(0)">Cancel</button>
+                    <button class="btn btn--secondary btn--sm" (click)="editingId.set(null)">Cancel</button>
                   } @else {
                     <!-- normal state -->
                     <button class="btn btn--secondary btn--sm"
@@ -93,18 +87,14 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
                     </button>
 
                     @if (user.role !== 'TeamLead') {
+                      <!-- Can only promote a member; demotion happens automatically -->
                       <button class="btn btn--secondary btn--sm"
                         [disabled]="updatingId() === user.id"
                         (click)="makeLead(user)">
-                        Make Lead
-                      </button>
-                    } @else {
-                      <button class="btn btn--secondary btn--sm"
-                        [disabled]="updatingId() === user.id"
-                        (click)="removeLead(user)">
-                        Remove Lead
+                        @if (updatingId() === user.id) { <span class="spinner"></span> } @else { Make Lead }
                       </button>
                     }
+                    <!-- No "Remove Lead" button: the lead can only be TRANSFERRED, not removed -->
 
                     @if (user.isActive) {
                       <button class="btn btn--danger btn--sm"
@@ -180,12 +170,11 @@ export class ManageTeamComponent implements OnInit {
 
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly updatingId = signal(0);
-  readonly editingId = signal(0);
+  readonly updatingId = signal<string | null>(null);
+  readonly editingId = signal<string | null>(null);
   readonly allUsers = signal<User[]>([]);
 
   newName = '';
-  newRole: UserRole = 'TeamMember';
   editName = '';
 
   ngOnInit(): void {
@@ -202,11 +191,11 @@ export class ManageTeamComponent implements OnInit {
   save(): void {
     if (!this.newName.trim()) { this.toast.error('Name is required.'); return; }
     this.saving.set(true);
-    this.api.createUser({ name: this.newName.trim(), role: this.newRole }).subscribe({
+    // New members always join as TeamMember — use "Make Lead" to promote.
+    this.api.createUser({ name: this.newName.trim(), role: 'TeamMember' }).subscribe({
       next: (user) => {
         this.allUsers.update(list => [...list, user]);
         this.newName = '';
-        this.newRole = 'TeamMember';
         this.saving.set(false);
         this.toast.success(`${user.name} added to the team! 🎉`);
       },
@@ -228,13 +217,13 @@ export class ManageTeamComponent implements OnInit {
     this.api.updateUser(user.id, { name: this.editName.trim() }).subscribe({
       next: (updated) => {
         this.allUsers.update(list => list.map(u => u.id === updated.id ? updated : u));
-        this.editingId.set(0);
-        this.updatingId.set(0);
+        this.editingId.set(null);
+        this.updatingId.set(null);
         this.toast.success(`Name updated to "${updated.name}".`);
       },
       error: (err) => {
         this.toast.error(err.error?.detail ?? 'Update failed.');
-        this.updatingId.set(0);
+        this.updatingId.set(null);
       }
     });
   }
@@ -243,23 +232,26 @@ export class ManageTeamComponent implements OnInit {
     this.updatingId.set(user.id);
     this.api.updateUser(user.id, { role: 'TeamLead' }).subscribe({
       next: (updated) => {
-        this.allUsers.update(list => list.map(u => u.id === updated.id ? updated : u));
-        this.updatingId.set(0);
-        this.toast.success(`${updated.name} is now Team Lead! 👑`);
+        // Reload ALL users — the backend also demoted the previous lead, so we
+        // must refresh the full list to reflect both changes.
+        this.api.getAllUsers().subscribe({
+          next: (freshUsers) => {
+            this.allUsers.set(freshUsers);
+            // If the currently logged-in user's role just changed, update AuthService too.
+            const me = this.auth.currentUser();
+            if (me) {
+              const meUpdated = freshUsers.find(u => u.id === me.id);
+              if (meUpdated && meUpdated.role !== me.role) {
+                this.auth.setCurrentUser(meUpdated);
+              }
+            }
+            this.updatingId.set(null);
+            this.toast.success(`${updated.name} is now Team Lead! 👑 Previous lead has been set to Member.`);
+          },
+          error: () => { this.loadUsers(); this.updatingId.set(null); }
+        });
       },
-      error: () => { this.toast.error('Update failed.'); this.updatingId.set(0); }
-    });
-  }
-
-  removeLead(user: User): void {
-    this.updatingId.set(user.id);
-    this.api.updateUser(user.id, { role: 'TeamMember' }).subscribe({
-      next: (updated) => {
-        this.allUsers.update(list => list.map(u => u.id === updated.id ? updated : u));
-        this.updatingId.set(0);
-        this.toast.success(`${updated.name} is now a Team Member.`);
-      },
-      error: () => { this.toast.error('Update failed.'); this.updatingId.set(0); }
+      error: (err) => { this.toast.error(err.error?.detail ?? 'Update failed.'); this.updatingId.set(null); }
     });
   }
 
@@ -268,11 +260,11 @@ export class ManageTeamComponent implements OnInit {
     this.api.updateUser(user.id, { isActive: !user.isActive }).subscribe({
       next: (updated) => {
         this.allUsers.update(list => list.map(u => u.id === updated.id ? updated : u));
-        this.updatingId.set(0);
+        this.updatingId.set(null);
         const msg = updated.isActive ? `${updated.name} reactivated.` : `${updated.name} deactivated.`;
         this.toast.success(msg);
       },
-      error: () => { this.toast.error('Update failed.'); this.updatingId.set(0); }
+      error: () => { this.toast.error('Update failed.'); this.updatingId.set(null); }
     });
   }
 

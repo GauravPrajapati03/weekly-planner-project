@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -16,9 +16,7 @@ import { User } from '../../core/models/models';
     <app-navbar />
     <div class="page">
       <div class="container" style="max-width: 720px;">
-        <div class="flex items-center gap-sm mb-sm">
-          <button class="btn btn--secondary btn--sm" (click)="router.navigate(['/home'])">← Home</button>
-        </div>
+        <button class="btn btn--ghost btn--sm mb-sm" (click)="router.navigate(['/home'])">← Home</button>
         <h2 class="mb-lg">Set Up This Week's Plan</h2>
 
         @if (!auth.isLead) {
@@ -32,88 +30,103 @@ import { User } from '../../core/models/models';
           <div class="text-center mt-xl"><div class="spinner"></div></div>
         } @else {
 
-          <!-- ── Section 1: Planning Date ────────────────────────────────────── -->
+          <!-- ── Section 1: Planning Date ─────────────────────────────────── -->
           <div class="setup-section">
-            <h4 class="section-title">📅 Planning date <span class="hint">(pick a Tuesday)</span></h4>
+            <h4 class="section-title">Planning date (pick a Tuesday)</h4>
             <input type="date" class="form-control date-input"
               [(ngModel)]="tuesdayDate"
-              (ngModelChange)="onDateChange()"
-              [min]="minDate" />
-            @if (workPeriod()) {
-              <p class="work-period-label">Work period: <strong>{{ workPeriod() }}</strong></p>
+              (ngModelChange)="onDateChange()" />
+            @if (workPeriod() && isTuesday()) {
+              <p class="work-period-label">Work period: {{ workPeriod() }}</p>
             }
             @if (tuesdayDate && !isTuesday()) {
-              <p class="error-hint">⚠️ Please pick a Tuesday for planning day.</p>
+              <p class="error-msg">⚠️ Please pick a Tuesday for the planning day.</p>
             }
           </div>
 
-          <!-- ── Section 2: Who is working ─────────────────────────────────── -->
+          <!-- ── Section 2: Who is working ──────────────────────────────── -->
           <div class="setup-section">
-            <h4 class="section-title">👥 Who is working this week?</h4>
+            <h4 class="section-title">Who is working this week?</h4>
             @for (user of activeUsers(); track user.id) {
               <label class="member-check">
                 <input type="checkbox"
                   [checked]="isSelected(user.id)"
-                  (change)="toggleMember(user.id)" />
+                  (change)="toggleMember(user.id, $event)" />
                 <span class="member-name">{{ user.name }}</span>
                 @if (user.role === 'TeamLead') {
-                  <span class="badge badge--info" style="font-size:0.65rem; padding:2px 8px;">Lead</span>
+                  <span class="lead-badge">Lead</span>
                 }
               </label>
             }
             <p class="member-summary">
-              Team members selected: <strong>{{ selectedCount() }}</strong>.
-              &nbsp; Total hours to plan: <strong>{{ totalTeamHours() }}</strong>
+              Team members selected: <strong>{{ selectedCount() }}</strong>.&nbsp;
+              Total hours to plan: <strong>{{ totalTeamHours() }}</strong>
             </p>
           </div>
 
-          <!-- ── Section 3: Category split ─────────────────────────────────── -->
+          <!-- ── Section 3: Category split ──────────────────────────────── -->
           <div class="setup-section">
-            <h4 class="section-title">⚖️ How should the hours be split?</h4>
+            <h4 class="section-title">How should the hours be split?</h4>
             <div class="split-grid">
               <div class="split-item">
                 <label class="form-label">Client Focused %</label>
                 <input type="number" class="form-control" [(ngModel)]="clientPct"
                   min="0" max="100" (ngModelChange)="recalc()" />
-                <div class="split-hours">= {{ clientHours() }}h</div>
               </div>
               <div class="split-item">
                 <label class="form-label">Tech Debt %</label>
                 <input type="number" class="form-control" [(ngModel)]="techPct"
                   min="0" max="100" (ngModelChange)="recalc()" />
-                <div class="split-hours">= {{ techHours() }}h</div>
               </div>
               <div class="split-item">
                 <label class="form-label">R&amp;D %</label>
                 <input type="number" class="form-control" [(ngModel)]="rdPct"
                   min="0" max="100" (ngModelChange)="recalc()" />
-                <div class="split-hours">= {{ rdHours() }}h</div>
               </div>
             </div>
 
-            <!-- Total indicator -->
-            <div class="total-row" [class.total-row--err]="total() !== 100">
-              <span [style.color]="total() !== 100 ? 'var(--status-error)' : 'var(--status-success)'">
-                Total: <strong>{{ total() }}%</strong>
-                @if (total() !== 100) { (must be 100%) }
-              </span>
+            <!-- Total row -->
+            <div class="total-row">
+              @if (total() !== 100) {
+                <span class="total-bad">Total: {{ total() }}% (must be 100%)</span>
+              } @else {
+                <span class="total-ok">Total: 100% ✓</span>
+              }
             </div>
+
+            <!-- Calculated hours — only shown when total = 100 and members selected -->
+            @if (total() === 100 && selectedCount() > 0) {
+              <div class="hours-row">
+                <div class="hours-chip hours-chip--client">
+                  <span class="hours-chip__label">Client</span>
+                  <span class="hours-chip__val">{{ clientHours() }}h</span>
+                </div>
+                <div class="hours-chip hours-chip--tech">
+                  <span class="hours-chip__label">Tech Debt</span>
+                  <span class="hours-chip__val">{{ techHours() }}h</span>
+                </div>
+                <div class="hours-chip hours-chip--rnd">
+                  <span class="hours-chip__label">R&amp;D</span>
+                  <span class="hours-chip__val">{{ rdHours() }}h</span>
+                </div>
+              </div>
+            }
           </div>
 
-          <!-- ── Submit ──────────────────────────────────────────────────────── -->
+          <!-- ── Submit ────────────────────────────────────────────────── -->
           <button class="btn btn--primary btn--full"
             [disabled]="!canSubmit() || saving()"
             (click)="create()">
-            @if (saving()) { <span class="spinner"></span> Opening... }
+            @if (saving()) { <span class="spinner"></span>&nbsp;Opening... }
             @else { Open Planning for the Team }
           </button>
 
           @if (!isTuesday() && tuesdayDate) {
-            <p class="text-sm text-muted text-center mt-md">Choose a Tuesday as the planning date.</p>
+            <p class="hint-msg">Select a Tuesday as the planning date.</p>
           } @else if (selectedCount() === 0) {
-            <p class="text-sm text-muted text-center mt-md">Select at least one team member.</p>
+            <p class="hint-msg">Select at least one team member.</p>
           } @else if (total() !== 100) {
-            <p class="text-sm text-muted text-center mt-md">Category percentages must add up to 100%.</p>
+            <p class="hint-msg">Category percentages must add up to 100%.</p>
           }
         }
       </div>
@@ -127,84 +140,67 @@ import { User } from '../../core/models/models';
       padding: var(--space-lg);
       margin-bottom: var(--space-lg);
     }
-
     .section-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: var(--space-md);
+      font-size: 1rem; font-weight: 600; margin: 0 0 var(--space-md);
     }
-
-    .hint {
-      font-size: 0.8rem;
-      font-weight: 400;
-      color: var(--text-muted);
-    }
-
-    .date-input { max-width: 260px; }
+    .date-input { max-width: 220px; }
 
     .work-period-label {
-      margin-top: var(--space-sm);
-      font-size: 0.84rem;
-      color: var(--text-secondary);
+      margin-top: var(--space-sm); font-size: 0.84rem; color: var(--text-secondary);
+    }
+    .error-msg {
+      margin-top: var(--space-sm); font-size: 0.84rem; color: var(--status-error, #e74c3c);
     }
 
-    .error-hint {
-      margin-top: var(--space-sm);
-      font-size: 0.84rem;
-      color: var(--status-error);
-    }
-
+    /* Member checkboxes */
     .member-check {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-sm) 0;
-      cursor: pointer;
-      user-select: none;
+      display: flex; align-items: center; gap: var(--space-sm);
+      padding: 6px 0; cursor: pointer; user-select: none;
     }
-
     .member-check input[type=checkbox] {
-      width: 16px;
-      height: 16px;
-      accent-color: var(--accent);
-      cursor: pointer;
+      width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
     }
-
     .member-name { font-weight: 500; }
-
+    .lead-badge {
+      font-size: 0.65rem; padding: 2px 8px;
+      border: 1px solid var(--accent); border-radius: 999px;
+      color: var(--accent); font-weight: 600;
+    }
     .member-summary {
-      margin-top: var(--space-md);
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      padding-top: var(--space-md);
-      border-top: 1px solid var(--border);
+      margin-top: var(--space-md); font-size: 0.85rem; color: var(--text-secondary);
+      padding-top: var(--space-md); border-top: 1px solid var(--border);
     }
 
+    /* Category split */
     .split-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-md);
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md);
     }
     @media (max-width: 600px) { .split-grid { grid-template-columns: 1fr; } }
-
     .split-item { display: flex; flex-direction: column; gap: var(--space-sm); }
 
-    .split-hours {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--accent);
-    }
+    .total-row { margin-top: var(--space-md); }
+    .total-bad { color: var(--status-error, #e74c3c); font-weight: 600; font-size: 0.95rem; }
+    .total-ok  { color: var(--status-success, #27ae60); font-weight: 600; font-size: 0.95rem; }
 
-    .total-row {
-      margin-top: var(--space-md);
-      padding: var(--space-sm) var(--space-md);
-      background: var(--bg-input);
-      border-radius: var(--border-radius);
+    /* Calculated hours chips */
+    .hours-row {
+      display: flex; gap: var(--space-md); flex-wrap: wrap;
+      margin-top: var(--space-lg);
     }
-
-    .total-row--err { color: var(--status-error); }
+    .hours-chip {
+      flex: 1; min-width: 80px;
+      border-radius: var(--border-radius-lg);
+      padding: var(--space-md) var(--space-lg);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .hours-chip--client  { background: rgba(52,152,219,0.15); border: 1px solid rgba(52,152,219,0.4); }
+    .hours-chip--tech    { background: rgba(230,126,34,0.15);  border: 1px solid rgba(230,126,34,0.4); }
+    .hours-chip--rnd     { background: rgba(155,89,182,0.15);  border: 1px solid rgba(155,89,182,0.4); }
+    .hours-chip__label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; }
+    .hours-chip__val   { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
 
     .btn--full { width: 100%; height: 50px; font-size: 1rem; font-weight: 600; }
+    .hint-msg  { text-align: center; font-size: 0.84rem; color: var(--text-secondary); margin-top: var(--space-sm); }
   `]
 })
 export class WeekSetupComponent implements OnInit {
@@ -218,12 +214,11 @@ export class WeekSetupComponent implements OnInit {
   readonly loadingUsers = signal(true);
   readonly activeUsers = signal<User[]>([]);
 
-  // Date
+  // Date — no minDate restriction, all Tuesdays selectable
   tuesdayDate = '';
-  minDate = new Date().toISOString().split('T')[0];
 
-  // Member selection
-  selectedIds = new Set<number>();
+  // Member selection — use a signal-tracked array of selected IDs for reactivity
+  private _selectedIds = signal<Set<string>>(new Set<string>());
 
   // Category %
   clientPct = 0;
@@ -231,21 +226,19 @@ export class WeekSetupComponent implements OnInit {
   rdPct = 0;
 
   readonly total = signal(0);
-  readonly selectedCount = computed(() => this.selectedIds.size);
 
-  /** 30h per person × number of selected members */
-  readonly totalTeamHours = computed(() => this.selectedIds.size * 30);
+  selectedCount() { return this._selectedIds().size; }
 
-  /** Per-category hours based on TOTAL team hours (not single person) */
-  readonly clientHours = computed(() => Math.round(this.clientPct / 100 * this.totalTeamHours() * 10) / 10);
-  readonly techHours = computed(() => Math.round(this.techPct / 100 * this.totalTeamHours() * 10) / 10);
-  readonly rdHours = computed(() => Math.round(this.rdPct / 100 * this.totalTeamHours() * 10) / 10);
+  /** 30h per person × selected members */
+  totalTeamHours() { return this._selectedIds().size * 30; }
+
+  clientHours() { return Math.round(this.clientPct / 100 * this.totalTeamHours() * 10) / 10; }
+  techHours() { return Math.round(this.techPct / 100 * this.totalTeamHours() * 10) / 10; }
+  rdHours() { return Math.round(this.rdPct / 100 * this.totalTeamHours() * 10) / 10; }
 
   ngOnInit(): void {
     this.recalc();
-    // Set default to next Tuesday
-    this.tuesdayDate = this.getNextTuesday();
-    this.onDateChange();
+    this.tuesdayDate = this.nearestTuesday();
 
     this.api.getActivePlan().subscribe({
       next: (plan) => this.existingPlan.set(plan),
@@ -256,7 +249,8 @@ export class WeekSetupComponent implements OnInit {
       next: (users) => {
         this.activeUsers.set(users);
         // All active members selected by default
-        users.forEach(u => this.selectedIds.add(u.id));
+        const ids = new Set<string>(users.map(u => u.id));
+        this._selectedIds.set(ids);
         this.loadingUsers.set(false);
       },
       error: () => this.loadingUsers.set(false)
@@ -265,44 +259,50 @@ export class WeekSetupComponent implements OnInit {
 
   isTuesday(): boolean {
     if (!this.tuesdayDate) return false;
-    // Parse as local date to avoid timezone off-by-one
     const [y, m, d] = this.tuesdayDate.split('-').map(Number);
-    return new Date(y, m - 1, d).getDay() === 2; // 2 = Tuesday
+    return new Date(y, m - 1, d).getDay() === 2;
   }
 
-  onDateChange(): void {
-    // no extra logic needed — workPeriod() is computed
-  }
+  onDateChange(): void { /* template drives workPeriod() */ }
 
   workPeriod(): string {
     if (!this.tuesdayDate || !this.isTuesday()) return '';
     const [y, m, d] = this.tuesdayDate.split('-').map(Number);
-    const tuesday = new Date(y, m - 1, d);
-    // Work period: Wed (tuesday+1) to Mon (tuesday+6)
-    const wed = new Date(tuesday); wed.setDate(tuesday.getDate() + 1);
-    const mon = new Date(tuesday); mon.setDate(tuesday.getDate() + 6);
-    const fmt = (dt: Date) => dt.toISOString().split('T')[0];
+    const tue = new Date(y, m - 1, d);
+    const wed = new Date(tue); wed.setDate(tue.getDate() + 1);
+    const mon = new Date(tue); mon.setDate(tue.getDate() + 6);
+    const fmt = (dt: Date) => {
+      const yy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    };
     return `${fmt(wed)} to ${fmt(mon)}`;
   }
 
-  getNextTuesday(): string {
+  /** Returns the most recent Tuesday on or before today (using local date, not UTC) */
+  nearestTuesday(): string {
     const today = new Date();
-    const day = today.getDay();
-    const daysUntilTuesday = (2 - day + 7) % 7 || 7; // 2 = Tuesday; if today is Tuesday, go to next Tuesday
-    const next = new Date(today);
-    next.setDate(today.getDate() + daysUntilTuesday);
-    return next.toISOString().split('T')[0];
+    const day = today.getDay(); // 0=Sun 1=Mon 2=Tue ...
+    const offset = day >= 2 ? day - 2 : day + 5; // days since last Tuesday
+    const tue = new Date(today);
+    tue.setDate(today.getDate() - offset);
+    const yy = tue.getFullYear();
+    const mm = String(tue.getMonth() + 1).padStart(2, '0');
+    const dd = String(tue.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
   }
 
-  toggleMember(id: number): void {
-    if (this.selectedIds.has(id)) this.selectedIds.delete(id);
-    else this.selectedIds.add(id);
-    // Trigger signal update for computed
-    this.selectedIds = new Set(this.selectedIds);
+  toggleMember(id: string, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const current = new Set<string>(this._selectedIds());
+    if (checked) current.add(id);
+    else current.delete(id);
+    this._selectedIds.set(current);
   }
 
-  isSelected(id: number): boolean {
-    return this.selectedIds.has(id);
+  isSelected(id: string): boolean {
+    return this._selectedIds().has(id);
   }
 
   recalc(): void {
@@ -317,18 +317,23 @@ export class WeekSetupComponent implements OnInit {
     if (!this.canSubmit()) return;
     this.saving.set(true);
 
-    // The weekStartDate sent to backend is the Wednesday (tuesday+1)
     const [y, m, d] = this.tuesdayDate.split('-').map(Number);
-    const tuesday = new Date(y, m - 1, d);
-    const wednesday = new Date(tuesday);
-    wednesday.setDate(tuesday.getDate() + 1);
-    const weekStartDate = wednesday.toISOString().split('T')[0];
+    const tue = new Date(y, m - 1, d);
+    const wed = new Date(tue);
+    wed.setDate(tue.getDate() + 1);
+    // Use local date formatting to avoid timezone off-by-one (toISOString converts to UTC)
+    const wy = wed.getFullYear();
+    const wm = String(wed.getMonth() + 1).padStart(2, '0');
+    const wd = String(wed.getDate()).padStart(2, '0');
+    const weekStartDate = `${wy}-${wm}-${wd}`;
 
     this.api.createPlan({
       weekStartDate,
       clientPercent: this.clientPct,
       techDebtPercent: this.techPct,
-      rdPercent: this.rdPct
+      rdPercent: this.rdPct,
+      totalTeamHours: this.totalTeamHours(),
+      selectedMemberIds: Array.from(this._selectedIds())
     }).subscribe({
       next: () => {
         this.toast.success('🚀 Week opened for planning! Team can now plan their work.');

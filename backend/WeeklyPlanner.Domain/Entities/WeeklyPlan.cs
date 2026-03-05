@@ -11,7 +11,7 @@ namespace WeeklyPlanner.Domain.Entities;
 /// </summary>
 public class WeeklyPlan
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>The Wednesday that starts the work period for this cycle.</summary>
     public DateTime WeekStartDate { get; set; }
@@ -42,6 +42,30 @@ public class WeeklyPlan
     /// See PlanStatus enum for transition rules.
     /// </summary>
     public PlanStatus Status { get; set; } = PlanStatus.Planning;
+
+    /// <summary>
+    /// Total hours available for planning = selected member count × 30h per person.
+    /// Used to compute per-category budget: CategoryBudget = (Percent / 100) × TotalTeamHours.
+    /// </summary>
+    public decimal TotalTeamHours { get; set; } = 30m;
+
+    /// <summary>
+    /// Comma-separated list of User GUIDs that were selected for this planning cycle.
+    /// Used to show all expected members in Review even if they have 0 tasks.
+    /// </summary>
+    public string SelectedMemberIdsJson { get; set; } = "";
+
+    /// <summary>Helper to get/set the selected member IDs as a typed list.</summary>
+    public List<Guid> GetSelectedMemberIds() =>
+        string.IsNullOrWhiteSpace(SelectedMemberIdsJson)
+            ? new List<Guid>()
+            : SelectedMemberIdsJson.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => Guid.TryParse(s.Trim(), out var g) ? g : Guid.Empty)
+                .Where(g => g != Guid.Empty)
+                .ToList();
+
+    public void SetSelectedMemberIds(IEnumerable<Guid> ids) =>
+        SelectedMemberIdsJson = string.Join(",", ids.Select(g => g.ToString()));
 
     /// <summary>UTC timestamp when this plan was first created (on the Tuesday planning session).</summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

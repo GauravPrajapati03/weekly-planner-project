@@ -3,6 +3,8 @@ using WeeklyPlanner.Application.Interfaces;
 using WeeklyPlanner.Application.Services;
 using WeeklyPlanner.Infrastructure.Data;
 using WeeklyPlanner.Infrastructure.Repositories;
+using WeeklyPlanner.Infrastructure.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,11 +30,15 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // ── Database (Entity Framework Core / Azure SQL) ───────────────────────────
+// Azure SQL Serverless auto-pauses after inactivity and can take ~60s to resume.
+// Retry 10× with up to 30s delay. Error 40613 = "database paused / not available".
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
-// Note: EnableRetryOnFailure is NOT used for LocalDB — it causes multiple simultaneous
-// connections which LocalDB (single-user) cannot handle. Re-add for Azure SQL production.
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 10,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: new[] { 40613, 40197, 40501, 49918 })));
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 // Allow Angular dev server (port 4200) and the deployed Azure Static Web App URL.
@@ -58,6 +64,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBacklogService, BacklogService>();
 builder.Services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 // ── Global Exception Handling ─────────────────────────────────────────────
 builder.Services.AddTransient<WeeklyPlanner.API.Middleware.GlobalExceptionHandler>();
@@ -69,10 +76,48 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
+    try
+    {
+        if (await db.Database.CanConnectAsync())
+        {
+            var pending = await db.Database.GetPendingMigrationsAsync();
+            if (pending.Any())
+            {
+                Console.WriteLine($"📦 Applying {pending.Count()} pending migration(s)...");
+                await db.Database.MigrateAsync();
+                Console.WriteLine("✅ Migrations applied successfully.");
+            }
+            else
+            {
+                Console.WriteLine("✅ Database is up-to-date.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("📝 Creating database and applying migrations...");
+            await db.Database.MigrateAsync();
+            Console.WriteLine("✅ Database created and migrations applied.");
+        }
+    }
+    catch (Exception ex)
+    {
+        // Unwrap AggregateException from EnableRetryOnFailure to check for duplicates
+        var sqlEx = ex as Microsoft.Data.SqlClient.SqlException
+                 ?? ex.InnerException as Microsoft.Data.SqlClient.SqlException
+                 ?? (ex as AggregateException)?.InnerExceptions
+                    .OfType<Microsoft.Data.SqlClient.SqlException>().FirstOrDefault();
+
+        if (sqlEx?.Number == 2714)
+            Console.WriteLine("✅ Schema already exists in Azure SQL \u2014 DB is up-to-date.");
+        else
+            Console.WriteLine($"\u26a0\ufe0f  DB init warning: {ex.GetType().Name}: {ex.Message.Split('\n')[0]}");
+    }
 }
 
 // ── Middleware Pipeline ────────────────────────────────────────────────────
+// Global exception handler MUST be first in pipeline to catch all exceptions
+app.UseMiddleware<WeeklyPlanner.API.Middleware.GlobalExceptionHandler>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -89,6 +134,8 @@ if (!app.Environment.IsDevelopment())
 app.UseCors("AllowAngular");
 // UseHttpsRedirection removed for local dev (no HTTPS cert configured for LocalDB profile)
 app.MapControllers();
+
+app.MapGet("/health", () => "Weekly Plan Tracker API is running 🚀");
 
 app.Run();
 
