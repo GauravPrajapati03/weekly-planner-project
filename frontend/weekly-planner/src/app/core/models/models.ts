@@ -1,5 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    TypeScript models matching the .NET domain entities exactly.
+   All IDs are string (UUID/GUID format) to match the backend Guid type.
    ───────────────────────────────────────────────────────────────────────────── */
 
 export type UserRole = 'TeamMember' | 'TeamLead';
@@ -7,25 +8,28 @@ export type CategoryType = 'Client' | 'TechDebt' | 'RnD';
 export type PlanStatus = 'Planning' | 'Frozen' | 'Completed';
 export type WorkItemStatus = 'NotStarted' | 'InProgress' | 'Completed' | 'Blocked';
 
+/** Lifecycle status of a backlog item. Matches the backend BacklogItemStatus enum. */
+export type BacklogItemStatus = 'Available' | 'InProgress' | 'Done' | 'Archived';
 
 export interface User {
-  id: number;
+  id: string;           // Guid
   name: string;
   role: UserRole;
   isActive: boolean;
 }
 
 export interface BacklogItem {
-  id: number;
+  id: string;           // Guid
   title: string;
   description: string;
   category: CategoryType;
-  isActive: boolean;
+  status: BacklogItemStatus;
+  isActive: boolean;    // Computed: true when status != Archived
   estimatedHours: number | null;
 }
 
 export interface WeeklyPlan {
-  id: number;
+  id: string;           // Guid
   weekStartDate: string;
   weekEndDate: string;
   clientPercent: number;
@@ -35,15 +39,17 @@ export interface WeeklyPlan {
   createdAt: string;
   frozenAt: string | null;
   completedAt: string | null;
+  totalTeamHours: number;
+  selectedMemberIds: string[];  // Which users were chosen for this planning cycle
 }
 
 export interface WeeklyPlanTask {
-  id: number;
-  weeklyPlanId: number;
-  backlogItemId: number;
+  id: string;           // Guid
+  weeklyPlanId: string; // Guid
+  backlogItemId: string; // Guid
   backlogItemTitle: string;
   category: CategoryType;
-  assignedUserId: number;
+  assignedUserId: string; // Guid
   assignedUserName: string;
   plannedHours: number;
   completedHours: number;
@@ -59,7 +65,7 @@ export interface CategoryProgress {
 }
 
 export interface UserProgress {
-  userId: number;
+  userId: string;       // Guid
   userName: string;
   plannedHours: number;
   completedHours: number;
@@ -92,7 +98,7 @@ export interface UpdateBacklogItemRequest {
   description?: string;
   category?: CategoryType;
   estimatedHours?: number | null;
-  isActive?: boolean;
+  status?: BacklogItemStatus;
 }
 
 export interface CreateWeeklyPlanRequest {
@@ -100,16 +106,18 @@ export interface CreateWeeklyPlanRequest {
   clientPercent: number;
   techDebtPercent: number;
   rdPercent: number;
+  totalTeamHours: number;
+  selectedMemberIds: string[];
 }
 
 export interface AssignTaskRequest {
-  backlogItemId: number;
-  assignedUserId: number;
+  backlogItemId: string;  // Guid
+  assignedUserId: string; // Guid
   plannedHours: number;
 }
 
 export interface UpdateProgressRequest {
-  taskId: number;
+  taskId: string;         // Guid
   completedHours: number;
   status?: WorkItemStatus;
 }
@@ -126,4 +134,12 @@ export const CATEGORY_BADGE_CLASS: Record<CategoryType, string> = {
   Client: 'badge--client',
   TechDebt: 'badge--techdebt',
   RnD: 'badge--rnd',
+};
+
+/** Human-readable labels for backlog item statuses. */
+export const BACKLOG_STATUS_LABELS: Record<BacklogItemStatus, string> = {
+  Available: 'AVAILABLE',
+  InProgress: 'IN PROGRESS',
+  Done: 'DONE',
+  Archived: 'ARCHIVED',
 };

@@ -314,34 +314,51 @@ export class HomeComponent implements OnInit {
     const isLead = this.auth.isLead;
     const cards: ActionCard[] = [];
 
-    // Lead: Start new week (only when no active plan)
-    if (isLead && !status)
-      cards.push({ title: 'Set Up This Week\'s Plan', description: 'Set dates, team members, and category budgets for the upcoming work cycle.', icon: '🗓️', route: '/week/setup', style: 'primary' });
+    // === No active plan ===
+    if (!status) {
+      if (isLead)
+        cards.push({ title: "Set Up This Week's Plan", description: 'Set dates, team members, and category budgets.', icon: '🗓️', route: '/week/setup', style: 'primary' });
+      cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
+      if (isLead) cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
+      cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });
+      return cards;
+    }
 
-    // Any member in Planning: plan their work
-    if (status === 'Planning')
+    // === Planning status ===
+    if (status === 'Planning') {
       cards.push({ title: 'Plan My Work', description: 'Pick backlog items and commit hours.', icon: '✍️', route: '/week/plan', style: 'primary' });
+      if (isLead) cards.push({ title: 'Review and Freeze the Plan', description: "Check everyone's hours and lock the plan.", icon: '❄️', route: '/week/review', style: 'warning' });
+      cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
+      if (isLead) cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
+      cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });
+      return cards;
+    }
 
-    // Lead in Planning: review and freeze
-    if (isLead && status === 'Planning')
-      cards.push({ title: 'Review and Freeze the Plan', description: 'Check everyone\'s hours and lock the plan.', icon: '❄️', route: '/week/review', style: 'warning' });
+    // === Frozen status ===
+    if (status === 'Frozen') {
+      if (isLead) {
+        // Lead frozen home — matches demo app screenshot 4
+        cards.push({ title: 'See Team Progress', description: 'Check how the team is doing.', icon: '📊', route: '/week/team-progress', style: 'primary' });
+        cards.push({ title: 'Update My Progress', description: 'Report hours and status on your tasks.', icon: '✏️', route: '/week/progress', style: 'success' });
+        cards.push({ title: 'Finish This Week', description: 'Close out this cycle.', icon: '✅', route: '/week/complete', style: 'success' });
+        cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
+        cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
+        cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });
+      } else {
+        // Team member frozen home
+        cards.push({ title: 'Update My Progress', description: 'Report hours and status on your tasks.', icon: '✏️', route: '/week/progress', style: 'primary' });
+        cards.push({ title: 'See Team Progress', description: 'See how the team is doing overall.', icon: '📊', route: '/week/team-progress', style: 'success' });
+        cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
+        cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });
+      }
+      return cards;
+    }
 
-    // Member in Frozen: update progress
-    if (status === 'Frozen')
-      cards.push({ title: 'Update My Progress', description: 'Report completed hours on each task.', icon: '📊', route: '/week/progress', style: 'success' });
-
-    // Lead in Frozen: complete the week
-    if (isLead && status === 'Frozen')
-      cards.push({ title: 'Team Progress', description: 'View overall dashboard and mark the week complete.', icon: '🏆', route: '/week/team-progress', style: 'success' });
-
-    // Always visible
+    // === Completed ===
     cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
-
-    if (isLead)
-      cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
-
+    if (isLead) cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
     cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });
-
+    if (isLead) cards.push({ title: "Set Up Next Week's Plan", description: 'Start a new planning cycle.', icon: '🗓️', route: '/week/setup', style: 'primary' });
     return cards;
   }
 
