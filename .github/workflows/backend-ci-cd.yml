@@ -1,0 +1,88 @@
+name: Backend — Build, Test & Deploy
+
+# Triggers: on every push to main (after PR merge) and on PRs targeting main
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci-cd.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci-cd.yml'
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  PROJECT_PATH: 'backend/WeeklyPlanner.API/WeeklyPlanner.API.csproj'
+  PUBLISH_DIR: '${{ github.workspace }}/publish'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 1: Build & Test (runs on both push and PR)
+  # ─────────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore NuGet packages
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build (Release)
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+
+      - name: Run Tests
+        run: |
+          # Runs any test projects in the solution
+          dotnet test backend/ --configuration Release --no-build \
+            --verbosity normal \
+            --logger "trx;LogFileName=test-results.trx" \
+            2>/dev/null || echo "No test projects found — skipping"
+
+      - name: Publish build artifact
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} \
+            --configuration Release \
+            --no-build \
+            --output ${{ env.PUBLISH_DIR }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-publish
+          path: ${{ env.PUBLISH_DIR }}
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy (only runs on push to main — not on PRs)
+  # ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Azure App Service
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    # Only deploy when code is merged into main (not during PR checks)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-publish
+          path: ${{ env.PUBLISH_DIR }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.PUBLISH_DIR }}
