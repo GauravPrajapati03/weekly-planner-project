@@ -41,7 +41,7 @@ jobs:
 
       - name: Run unit tests (no browser)
         working-directory: frontend/weekly-planner
-        run: npx ng test --watch=false --browsers=ChromeHeadless
+        run: npx ng test --watch=false
 
       - name: Build for production
         working-directory: frontend/weekly-planner
