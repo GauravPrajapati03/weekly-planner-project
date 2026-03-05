@@ -27,7 +27,13 @@ public class BacklogItemConfiguration : IEntityTypeConfiguration<BacklogItem>
         builder.Property(b => b.Title).IsRequired().HasMaxLength(200);
         builder.Property(b => b.Description).HasMaxLength(2000);
         builder.Property(b => b.Category).HasConversion<string>().IsRequired();
-        builder.Property(b => b.IsActive).HasDefaultValue(true);
+        builder.Property(b => b.Status).HasConversion<string>().HasDefaultValue(BacklogItemStatus.Available);
+
+        // Computed property — EF should not try to map this column
+        builder.Ignore(b => b.IsActive);
+
+        // Index on Status for fast filtered queries (e.g., "show only Available items")
+        builder.HasIndex(b => b.Status);
     }
 }
 

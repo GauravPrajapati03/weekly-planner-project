@@ -1,41 +1,41 @@
 using WeeklyPlanner.Domain.Enums;
 
-
 namespace WeeklyPlanner.Application.DTOs;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// USER DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// <summary>Read model returned to clients for a team member.</summary>
-public record UserDto(int Id, string Name, UserRole Role, bool IsActive);
-
-/// <summary>Request model for creating a new team member.</summary>
+// ── USER ──────────────────────────────────────────────────────────────────────
+public record UserDto(Guid Id, string Name, UserRole Role, bool IsActive);
 public record CreateUserRequest(string Name, UserRole Role);
-
-/// <summary>Request model for updating a team member's name, role, or active status.</summary>
 public record UpdateUserRequest(string? Name, UserRole? Role, bool? IsActive);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BACKLOG DTOs
-// ─────────────────────────────────────────────────────────────────────────────
+// ── BACKLOG ───────────────────────────────────────────────────────────────────
 
-/// <summary>Read model returned to clients for a backlog item.</summary>
-public record BacklogItemDto(int Id, string Title, string Description, CategoryType Category, bool IsActive, int? EstimatedHours);
+/// <summary>Backlog item returned to the client. Status is the string form of BacklogItemStatus.</summary>
+public record BacklogItemDto(
+    Guid Id,
+    string Title,
+    string Description,
+    CategoryType Category,
+    string Status,
+    bool IsActive,
+    int? EstimatedHours);
 
-/// <summary>Request model for creating a new backlog item.</summary>
-public record CreateBacklogItemRequest(string Title, string Description, CategoryType Category, int? EstimatedHours = null);
+public record CreateBacklogItemRequest(
+    string Title,
+    string Description,
+    CategoryType Category,
+    int? EstimatedHours = null);
 
-/// <summary>Request model for updating an existing backlog item (edit, unarchive, etc.).</summary>
-public record UpdateBacklogItemRequest(string? Title, string? Description, CategoryType? Category, int? EstimatedHours, bool? IsActive = null);
+/// <summary>Partial update request. Status can be set to change the lifecycle state.</summary>
+public record UpdateBacklogItemRequest(
+    string? Title,
+    string? Description,
+    CategoryType? Category,
+    int? EstimatedHours,
+    BacklogItemStatus? Status = null);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WEEKLY PLAN DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// <summary>Read model returned to clients for a weekly plan summary.</summary>
+// ── WEEKLY PLAN ───────────────────────────────────────────────────────────────
 public record WeeklyPlanDto(
-    int Id,
+    Guid Id,
     DateTime WeekStartDate,
     DateTime WeekEndDate,
     decimal ClientPercent,
@@ -44,29 +44,28 @@ public record WeeklyPlanDto(
     string Status,
     DateTime CreatedAt,
     DateTime? FrozenAt,
-    DateTime? CompletedAt
+    DateTime? CompletedAt,
+    decimal TotalTeamHours,
+    List<string> SelectedMemberIds
 );
 
-/// <summary>Request model for creating a new weekly planning cycle (Team Lead only).</summary>
 public record CreateWeeklyPlanRequest(
     DateTime WeekStartDate,
     decimal ClientPercent,
     decimal TechDebtPercent,
-    decimal RDPercent
+    decimal RDPercent,
+    decimal TotalTeamHours,
+    List<Guid>? SelectedMemberIds = null
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TASK ASSIGNMENT DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// <summary>Read model for a task assignment within a plan, including backlog and user details.</summary>
+// ── TASK ASSIGNMENT ───────────────────────────────────────────────────────────
 public record WeeklyPlanTaskDto(
-    int Id,
-    int WeeklyPlanId,
-    int BacklogItemId,
+    Guid Id,
+    Guid WeeklyPlanId,
+    Guid BacklogItemId,
     string BacklogItemTitle,
     CategoryType Category,
-    int AssignedUserId,
+    Guid AssignedUserId,
     string AssignedUserName,
     decimal PlannedHours,
     decimal CompletedHours,
@@ -74,21 +73,15 @@ public record WeeklyPlanTaskDto(
     WorkItemStatus Status
 );
 
-/// <summary>Request model for assigning a backlog item to a user within a weekly plan.</summary>
 public record AssignTaskRequest(
-    int BacklogItemId,
-    int AssignedUserId,
+    Guid BacklogItemId,
+    Guid AssignedUserId,
     decimal PlannedHours
 );
 
-/// <summary>Request model for updating a task's completed hours and status (post-freeze progress tracking).</summary>
-public record UpdateProgressRequest(int TaskId, decimal CompletedHours, WorkItemStatus? Status = null);
+public record UpdateProgressRequest(Guid TaskId, decimal CompletedHours, WorkItemStatus? Status = null);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// <summary>Aggregated dashboard data for a weekly plan — used by the Team Lead progress view.</summary>
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
 public record DashboardDto(
     decimal TotalPlannedHours,
     decimal TotalCompletedHours,
@@ -98,7 +91,6 @@ public record DashboardDto(
     IEnumerable<WeeklyPlanTaskDto> Tasks
 );
 
-/// <summary>Progress summary for one category within a weekly plan.</summary>
 public record CategoryProgressDto(
     string Category,
     decimal PlannedHours,
@@ -106,35 +98,35 @@ public record CategoryProgressDto(
     decimal ProgressPercent
 );
 
-/// <summary>Progress summary for one user within a weekly plan.</summary>
 public record UserProgressDto(
-    int UserId,
+    Guid UserId,
     string UserName,
     decimal PlannedHours,
     decimal CompletedHours,
     decimal ProgressPercent,
     IEnumerable<WeeklyPlanTaskDto> Tasks
 );
-/// <summary>Root export/import payload representing the full app state.</summary>
+
+// ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
 public record AppExportDto(
-    IEnumerable<AppExportUserDto>     Users,
-    IEnumerable<AppExportBacklogDto>  BacklogItems,
-    IEnumerable<AppExportPlanDto>     WeeklyPlans,
-    IEnumerable<AppExportTaskDto>     WeeklyPlanTasks,
+    IEnumerable<AppExportUserDto>    Users,
+    IEnumerable<AppExportBacklogDto> BacklogItems,
+    IEnumerable<AppExportPlanDto>    WeeklyPlans,
+    IEnumerable<AppExportTaskDto>    WeeklyPlanTasks,
     DateTime ExportedAt
 );
 
-public record AppExportUserDto(int Id, string Name, UserRole Role, bool IsActive);
+public record AppExportUserDto(Guid Id, string Name, UserRole Role, bool IsActive);
 
 public record AppExportBacklogDto(
-    int Id, string Title, string Description,
-    CategoryType Category, bool IsActive, int? EstimatedHours);
+    Guid Id, string Title, string Description,
+    CategoryType Category, string Status, int? EstimatedHours);
 
 public record AppExportPlanDto(
-    int Id, DateTime WeekStartDate, DateTime WeekEndDate,
+    Guid Id, DateTime WeekStartDate, DateTime WeekEndDate,
     decimal ClientPercent, decimal TechDebtPercent, decimal RDPercent,
     PlanStatus Status, DateTime CreatedAt, DateTime? FrozenAt, DateTime? CompletedAt);
 
 public record AppExportTaskDto(
-    int Id, int WeeklyPlanId, int BacklogItemId, int AssignedUserId,
+    Guid Id, Guid WeeklyPlanId, Guid BacklogItemId, Guid AssignedUserId,
     decimal PlannedHours, decimal CompletedHours, WorkItemStatus Status);

@@ -28,7 +28,8 @@ public class AdminService : IAdminService
 
         return new AppExportDto(
             users.Select(u => new AppExportUserDto(u.Id, u.Name, u.Role, u.IsActive)),
-            backlog.Select(b => new AppExportBacklogDto(b.Id, b.Title, b.Description, b.Category, b.IsActive, b.EstimatedHours)),
+            backlog.Select(b => new AppExportBacklogDto(b.Id, b.Title, b.Description,
+                b.Category, b.Status.ToString(), b.EstimatedHours)),
             plans.Select(p => new AppExportPlanDto(p.Id, p.WeekStartDate, p.WeekEndDate,
                 p.ClientPercent, p.TechDebtPercent, p.RDPercent,
                 p.Status, p.CreatedAt, p.FrozenAt, p.CompletedAt)),
@@ -56,7 +57,11 @@ public class AdminService : IAdminService
         {
             await _db.BacklogItems.AddRangeAsync(data.BacklogItems.Select(b => new BacklogItem
                 { Id = b.Id, Title = b.Title, Description = b.Description,
-                  Category = b.Category, IsActive = b.IsActive, EstimatedHours = b.EstimatedHours }));
+                  Category = b.Category,
+                  Status = Enum.TryParse<BacklogItemStatus>(b.Status, out var parsed)
+                      ? parsed
+                      : BacklogItemStatus.Available,
+                  EstimatedHours = b.EstimatedHours }));
             await _db.SaveChangesAsync();
         }
 
@@ -96,14 +101,14 @@ public class AdminService : IAdminService
         // ── Backlog Items (matching demo app) ──────────────────────────────
         var items = new[]
         {
-            new BacklogItem { Title = "Customer onboarding redesign",    Description = "Revamp the onboarding flow for new customers.",          Category = CategoryType.Client,   IsActive = true, EstimatedHours = 12 },
-            new BacklogItem { Title = "Fix billing invoice formatting",  Description = "Correct the invoice PDF layout for enterprise clients.", Category = CategoryType.Client,   IsActive = true, EstimatedHours = 4  },
-            new BacklogItem { Title = "Customer feedback dashboard",     Description = "Build a dashboard to visualise customer feedback data.", Category = CategoryType.Client,   IsActive = true, EstimatedHours = 16 },
-            new BacklogItem { Title = "Migrate database to PostgreSQL",  Description = "Move from MySQL to PostgreSQL for better scalability.",  Category = CategoryType.TechDebt, IsActive = true, EstimatedHours = 20 },
-            new BacklogItem { Title = "Remove deprecated API endpoints", Description = "Clean up v1 API endpoints no longer in use.",            Category = CategoryType.TechDebt, IsActive = true, EstimatedHours = 8  },
-            new BacklogItem { Title = "Upgrade to .NET 9",              Description = "Upgrade backend runtime to .NET 9 LTS.",                  Category = CategoryType.TechDebt, IsActive = true, EstimatedHours = 10 },
-            new BacklogItem { Title = "AI-powered task prioritisation",  Description = "Research using LLMs to auto-sort the backlog.",          Category = CategoryType.RnD,      IsActive = true, EstimatedHours = 24 },
-            new BacklogItem { Title = "Explore AI summarisation",        Description = "POC for meeting summary generation via AI.",              Category = CategoryType.RnD,      IsActive = true, EstimatedHours = 8  },
+            new BacklogItem { Title = "Customer onboarding redesign",    Description = "Revamp the onboarding flow for new customers.",          Category = CategoryType.Client,   Status = BacklogItemStatus.Available, EstimatedHours = 12 },
+            new BacklogItem { Title = "Fix billing invoice formatting",  Description = "Correct the invoice PDF layout for enterprise clients.", Category = CategoryType.Client,   Status = BacklogItemStatus.Available, EstimatedHours = 4  },
+            new BacklogItem { Title = "Customer feedback dashboard",     Description = "Build a dashboard to visualise customer feedback data.", Category = CategoryType.Client,   Status = BacklogItemStatus.Available, EstimatedHours = 16 },
+            new BacklogItem { Title = "Migrate database to PostgreSQL",  Description = "Move from MySQL to PostgreSQL for better scalability.",  Category = CategoryType.TechDebt, Status = BacklogItemStatus.Available, EstimatedHours = 20 },
+            new BacklogItem { Title = "Remove deprecated API endpoints", Description = "Clean up v1 API endpoints no longer in use.",            Category = CategoryType.TechDebt, Status = BacklogItemStatus.Available, EstimatedHours = 8  },
+            new BacklogItem { Title = "Upgrade to .NET 9",              Description = "Upgrade backend runtime to .NET 9 LTS.",                  Category = CategoryType.TechDebt, Status = BacklogItemStatus.Available, EstimatedHours = 10 },
+            new BacklogItem { Title = "AI-powered task prioritisation",  Description = "Research using LLMs to auto-sort the backlog.",          Category = CategoryType.RnD,      Status = BacklogItemStatus.Available, EstimatedHours = 24 },
+            new BacklogItem { Title = "Explore AI summarisation",        Description = "POC for meeting summary generation via AI.",              Category = CategoryType.RnD,      Status = BacklogItemStatus.Available, EstimatedHours = 8  },
         };
 
         await _db.BacklogItems.AddRangeAsync(items);
@@ -122,16 +127,11 @@ public class AdminService : IAdminService
     /// </summary>
     private async Task ClearAllTablesAsync()
     {
-        _db.WeeklyPlanTasks.RemoveRange(_db.WeeklyPlanTasks);
-        await _db.SaveChangesAsync();
-
-        _db.WeeklyPlans.RemoveRange(_db.WeeklyPlans);
-        await _db.SaveChangesAsync();
-
-        _db.BacklogItems.RemoveRange(_db.BacklogItems);
-        await _db.SaveChangesAsync();
-
-        _db.Users.RemoveRange(_db.Users);
-        await _db.SaveChangesAsync();
+        // ExecuteDeleteAsync issues a single raw DELETE SQL per table — no tracking needed.
+        // FK dependency order: Tasks → Plans → BacklogItems → Users
+        await _db.WeeklyPlanTasks.ExecuteDeleteAsync();
+        await _db.WeeklyPlans.ExecuteDeleteAsync();
+        await _db.BacklogItems.ExecuteDeleteAsync();
+        await _db.Users.ExecuteDeleteAsync();
     }
 }

@@ -5,25 +5,30 @@
 namespace WeeklyPlanner.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddWorkItemStatusToTask : Migration
+    public partial class FixWeeklyPlanTaskStatusEnum : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
+            migrationBuilder.AlterColumn<string>(
                 name: "Status",
                 table: "WeeklyPlanTasks",
-                type: "int",
+                type: "nvarchar(max)",
                 nullable: false,
-                defaultValue: 0);
+                oldClrType: typeof(int),
+                oldType: "int");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
+            migrationBuilder.AlterColumn<int>(
                 name: "Status",
-                table: "WeeklyPlanTasks");
+                table: "WeeklyPlanTasks",
+                type: "int",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(max)");
         }
     }
 }

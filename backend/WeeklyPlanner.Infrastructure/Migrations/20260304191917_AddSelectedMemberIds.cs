@@ -5,24 +5,25 @@
 namespace WeeklyPlanner.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddEstimatedHoursToBacklogItem : Migration
+    public partial class AddSelectedMemberIds : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "EstimatedHours",
-                table: "BacklogItems",
-                type: "int",
-                nullable: true);
+            migrationBuilder.AddColumn<string>(
+                name: "SelectedMemberIdsJson",
+                table: "WeeklyPlans",
+                type: "nvarchar(max)",
+                nullable: false,
+                defaultValue: "");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "EstimatedHours",
-                table: "BacklogItems");
+                name: "SelectedMemberIdsJson",
+                table: "WeeklyPlans");
         }
     }
 }
