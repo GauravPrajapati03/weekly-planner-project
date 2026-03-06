@@ -35,6 +35,14 @@ type View = 'plan' | 'backlog-list';
             <div class="alert alert--warning">The plan is {{ activePlan()?.status }} — no more changes allowed.</div>
           } @else {
 
+            <!-- Not-a-member banner (shown to users not in selectedMemberIds) -->
+            @if (!isInSelectedPlan()) {
+              <div class="alert alert--warning" style="margin-bottom: var(--space-lg);">
+                <strong>You are not included in this weekly plan.</strong><br>
+                Ask the Team Lead to include you in the plan setup.
+              </div>
+            }
+
             <!-- Your hours bar -->
             <div class="hours-bar card mb-lg">
               <span>Your hours: <strong>{{ claimedHours() }} of 30</strong> planned. <strong>{{ 30 - claimedHours() }} hours left.</strong></span>
@@ -60,10 +68,11 @@ type View = 'plan' | 'backlog-list';
               }
             </div>
 
-            <!-- Action buttons -->
+            <!-- Action buttons —
+                 'Add Work from Backlog' is DISABLED for non-members -->
             <div class="action-row mb-lg">
               <button class="btn btn--primary"
-                [disabled]="claimedHours() >= 30"
+                [disabled]="claimedHours() >= 30 || !isInSelectedPlan()"
                 (click)="view.set('backlog-list')">
                 Add Work from Backlog
               </button>
@@ -390,6 +399,19 @@ export class PlanMyWorkComponent implements OnInit {
   /** localStorage key for the submitted state: plan-submit-{planId}-{userId} */
   private submitKey(planId: string): string {
     return `plan-submit-${planId}-${this.auth.currentUser()?.id}`;
+  }
+
+  /** True if the current user is in the plan's selectedMemberIds list.
+   *  If selectedMemberIds is absent or empty the backend selected everyone,
+   *  so we allow access to avoid a false-negative. */
+  isInSelectedPlan(): boolean {
+    const plan = this.activePlan();
+    const userId = this.auth.currentUser()?.id;
+    if (!plan || !userId) return false;
+    const ids = plan.selectedMemberIds;
+    // If the plan has no selectedMemberIds recorded, treat everyone as included
+    if (!ids || ids.length === 0) return true;
+    return ids.includes(userId);
   }
 
   ngOnInit(): void {
