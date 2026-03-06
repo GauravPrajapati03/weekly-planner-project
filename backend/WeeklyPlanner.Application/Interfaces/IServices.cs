@@ -9,6 +9,7 @@ public interface IUserService
     Task<IEnumerable<UserDto>> GetAllUsersIncludingInactiveAsync();
     Task<UserDto> CreateUserAsync(CreateUserRequest request);
     Task<UserDto> UpdateUserAsync(Guid id, UpdateUserRequest request);
+    Task DeleteUserAsync(Guid id);
 }
 
 public interface IBacklogService

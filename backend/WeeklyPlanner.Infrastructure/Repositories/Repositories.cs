@@ -26,6 +26,7 @@ public class UserRepository : IUserRepository
         return user;
     }
 
+    public void Remove(User user) => _db.Users.Remove(user);
     public async Task SaveChangesAsync() => await _db.SaveChangesAsync();
 }
 

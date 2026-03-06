@@ -12,7 +12,8 @@ interface ActionCard {
   title: string;
   description: string;
   icon: string;
-  route: string;
+  route?: string;
+  action?: string;
   style: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
 }
 
@@ -65,12 +66,22 @@ interface ActionCard {
 
             <div class="grid-cards">
               <!-- Regular navigation cards -->
-              @for (card of visibleCards(); track card.route) {
-                <a [routerLink]="card.route" class="card card--clickable action-card action-card--{{ card.style }}">
-                  <div class="action-card__icon">{{ card.icon }}</div>
-                  <h3>{{ card.title }}</h3>
-                  <p>{{ card.description }}</p>
-                </a>
+              @for (card of visibleCards(); track card.title) {
+                @if (card.action) {
+                  <!-- Action card: click triggers method, no routing -->
+                  <div class="card card--clickable action-card action-card--{{ card.style }}"
+                    (click)="handleCardAction(card.action)">
+                    <div class="action-card__icon">{{ card.icon }}</div>
+                    <h3>{{ card.title }}</h3>
+                    <p>{{ card.description }}</p>
+                  </div>
+                } @else {
+                  <a [routerLink]="card.route" class="card card--clickable action-card action-card--{{ card.style }}">
+                    <div class="action-card__icon">{{ card.icon }}</div>
+                    <h3>{{ card.title }}</h3>
+                    <p>{{ card.description }}</p>
+                  </a>
+                }
               }
 
               <!-- Cancel Planning — destructive card (leads only, planning status only) -->
@@ -107,6 +118,25 @@ interface ActionCard {
         🗑️ Reset App
       </button>
     </div>
+
+    <!-- Finish This Week confirmation modal -->
+    @if (showFinishModal()) {
+      <div class="modal-overlay" (click)="showFinishModal.set(false)">
+        <div class="modal-box" (click)="$event.stopPropagation()" style="border-color: rgba(39,174,96,0.3);">
+          <h3 style="color: var(--status-success);">✅ Finish This Week?</h3>
+          <p style="color: var(--text-secondary); margin: var(--space-md) 0;">
+            This will mark the current week as <strong>Completed</strong> and close out all planning for this cycle.
+            The week will be moved to Past Weeks.
+          </p>
+          <div class="flex gap-md justify-end" style="margin-top: var(--space-lg);">
+            <button class="btn btn--secondary" (click)="showFinishModal.set(false)">Cancel</button>
+            <button class="btn btn--success-solid" [disabled]="finishing()" (click)="finishWeek()">
+              @if (finishing()) { <span class="spinner"></span> } @else { Yes, Finish This Week }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- Cancel confirmation modal -->
     @if (showCancelModal()) {
@@ -249,6 +279,14 @@ interface ActionCard {
       &:hover:not(:disabled) { background: #dc2626; }
     }
 
+    .btn--success-solid {
+      background: var(--status-success, #27ae60); color: white; border: none;
+      padding: 0.6rem 1.2rem; border-radius: var(--border-radius);
+      font-weight: 600; cursor: pointer;
+      &:disabled { opacity: 0.5; cursor: not-allowed; }
+      &:hover:not(:disabled) { background: #219150; }
+    }
+
     .btn--ghost {
       background: transparent; border: 1px solid var(--border);
       color: var(--text-secondary); font-size: 0.78rem; padding: 0.4rem 0.85rem;
@@ -290,6 +328,8 @@ export class HomeComponent implements OnInit {
   readonly loading = signal(true);
   readonly showCancelModal = signal(false);
   readonly cancelling = signal(false);
+  readonly finishing = signal(false);
+  readonly showFinishModal = signal(false);
 
   // Data management
   readonly adminBusy = signal(false);
@@ -339,7 +379,7 @@ export class HomeComponent implements OnInit {
       if (isLead) {
         cards.push({ title: 'See Team Progress', description: 'Check how the team is doing.', icon: '📊', route: '/week/team-progress', style: 'primary' });
         cards.push({ title: 'Update My Progress', description: 'Report hours and status on your tasks.', icon: '✏️', route: '/week/progress', style: 'success' });
-        cards.push({ title: 'Finish This Week', description: 'Close out this cycle.', icon: '✅', route: '/week/team-progress', style: 'success' });
+        cards.push({ title: 'Finish This Week', description: 'Close out this cycle when everyone is done.', icon: '✅', action: 'finish', style: 'success' });
         cards.push({ title: 'Manage Backlog', description: 'Add, edit, or browse work items.', icon: '📋', route: '/backlog', style: 'secondary' });
         cards.push({ title: 'Manage Team Members', description: 'Add or remove team members.', icon: '👥', route: '/team', style: 'secondary' });
         cards.push({ title: 'View Past Weeks', description: 'Look at completed planning cycles.', icon: '📅', route: '/past-weeks', style: 'secondary' });
@@ -363,6 +403,28 @@ export class HomeComponent implements OnInit {
 
   confirmCancel(): void {
     this.showCancelModal.set(true);
+  }
+
+  handleCardAction(action: string): void {
+    if (action === 'finish') this.showFinishModal.set(true);
+  }
+
+  finishWeek(): void {
+    const plan = this.activePlan();
+    if (!plan) return;
+    this.finishing.set(true);
+    this.api.completePlan(plan.id).subscribe({
+      next: () => {
+        this.activePlan.update(p => p ? { ...p, status: 'Completed' } : p);
+        this.showFinishModal.set(false);
+        this.finishing.set(false);
+        this.toast.success('🎉 Great work! This week is now completed!');
+      },
+      error: (err) => {
+        this.toast.error(err.error?.detail ?? 'Failed to finish the week.');
+        this.finishing.set(false);
+      }
+    });
   }
 
   cancelPlan(): void {

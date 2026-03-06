@@ -89,21 +89,40 @@ type View = 'plan' | 'backlog-list';
               <div class="plan-list">
                 @for (task of myTasks(); track task.id) {
                   <div class="plan-row card">
-                    <div class="plan-row__info">
-                      <strong>{{ task.backlogItemTitle }}</strong>
-                      <span class="badge {{ catClass(task.category) }}" style="margin-left:var(--space-sm);">
-                        {{ catLabel(task.category) }}
-                      </span>
-                      <span class="plan-row__hours">{{ task.plannedHours }}h</span>
+                    <div class="plan-row__top">
+                      <div class="plan-row__info">
+                        <strong>{{ task.backlogItemTitle }}</strong>
+                        <span class="badge {{ catClass(task.category) }}" style="margin-left:var(--space-sm);">
+                          {{ catLabel(task.category) }}
+                        </span>
+                        @if (editingTaskId() !== task.id) {
+                          <span class="plan-row__hours">{{ task.plannedHours }}h</span>
+                        }
+                      </div>
+                      <div class="plan-row__actions">
+                        @if (editingTaskId() !== task.id) {
+                          <button class="btn btn--ghost btn--sm" (click)="startInlineEdit(task)">Change Hours</button>
+                          <button class="btn btn--danger btn--sm"
+                            [disabled]="removingId() === task.id"
+                            (click)="removeTask(task)">
+                            @if (removingId() === task.id) { <span class="spinner"></span> } @else { Remove }
+                          </button>
+                        } @else {
+                          <input type="number" class="inline-hours-input"
+                            [(ngModel)]="inlineHoursVal"
+                            min="0.5" step="0.5"
+                            (keyup.enter)="saveInlineHours(task)"
+                            (keyup.escape)="cancelInlineEdit()" />
+                          <button class="btn btn--primary btn--sm"
+                            [disabled]="!inlineHoursVal || inlineHoursVal <= 0 || !!inlineEditError() || saving()"
+                            (click)="saveInlineHours(task)">Save</button>
+                          <button class="btn btn--secondary btn--sm" (click)="cancelInlineEdit()">Cancel</button>
+                        }
+                      </div>
                     </div>
-                    <div class="plan-row__actions">
-                      <button class="btn btn--ghost btn--sm" (click)="openChangeHours(task)">Change Hours</button>
-                      <button class="btn btn--danger btn--sm"
-                        [disabled]="removingId() === task.id"
-                        (click)="removeTask(task)">
-                        @if (removingId() === task.id) { <span class="spinner"></span> } @else { Remove }
-                      </button>
-                    </div>
+                    @if (editingTaskId() === task.id && inlineEditError()) {
+                      <p class="inline-error">{{ inlineEditError() }}</p>
+                    }
                   </div>
                 }
               </div>
@@ -131,15 +150,15 @@ type View = 'plan' | 'backlog-list';
             }
           </div>
 
-          <!-- Backlog items list -->
+          <!-- Backlog items list — shows ALL active items; items in MY plan are still shown -->
           <div class="backlog-list">
-            @if (availableBacklog().length === 0) {
+            @if (allBacklogForPicker().length === 0) {
               <div class="card text-secondary" style="padding:var(--space-lg);">
-                All available backlog items have already been added to your plan.
+                No available backlog items.
               </div>
             }
-            @for (item of availableBacklog(); track item.id) {
-              <div class="backlog-row card">
+            @for (item of allBacklogForPicker(); track item.id) {
+              <div class="backlog-row card" [class.backlog-row--mine]="isInMyPlan(item.id)">
                 <div class="backlog-row__info">
                   <div class="backlog-row__title">
                     <strong>{{ item.title }}</strong>
@@ -157,9 +176,13 @@ type View = 'plan' | 'backlog-list';
                     <p class="text-secondary text-sm mt-md" style="margin: 4px 0 0;">{{ item.description }}</p>
                   }
                 </div>
-                <button class="btn btn--secondary btn--sm" (click)="openPickModal(item)">
-                  Pick This Item
-                </button>
+                @if (isInMyPlan(item.id)) {
+                  <span class="in-plan-tag">✓ In your plan</span>
+                } @else {
+                  <button class="btn btn--secondary btn--sm" (click)="openPickModal(item)">
+                    Pick This Item
+                  </button>
+                }
               </div>
             }
           </div>
@@ -218,29 +241,7 @@ type View = 'plan' | 'backlog-list';
       </div>
     }
 
-    <!-- Change Hours modal -->
-    @if (changingTask()) {
-      <div class="modal-overlay" (click)="changingTask.set(null)">
-        <div class="modal-box" (click)="$event.stopPropagation()" style="max-width:420px;">
-          <div class="modal-header">
-            <h3>Change Hours</h3>
-            <button class="btn btn--ghost btn--sm" (click)="changingTask.set(null)">✕</button>
-          </div>
-          <p class="text-secondary mb-md">{{ changingTask()!.backlogItemTitle }}</p>
-          <div class="form-group mb-lg">
-            <label class="form-label">New hours (max {{ 30 - claimedHoursExcluding(changingTask()!.id) }}h)</label>
-            <input type="number" class="form-control"
-              [(ngModel)]="changeHoursVal"
-              min="0.5" step="0.5" />
-          </div>
-          <button class="btn btn--primary" style="width:100%;"
-            [disabled]="!changeHoursVal || changeHoursVal <= 0 || saving()"
-            (click)="saveChangedHours()">
-            @if (saving()) { <span class="spinner"></span> } @else { Save Changes }
-          </button>
-        </div>
-      </div>
-    }
+
   `,
   styles: [`
     /* Hours bar */
@@ -287,6 +288,9 @@ type View = 'plan' | 'backlog-list';
     .plan-list { display: flex; flex-direction: column; gap: var(--space-md); }
     .empty-plan { padding: var(--space-lg); color: var(--text-secondary); }
     .plan-row {
+      display: flex; flex-direction: column; gap: 4px; padding: var(--space-md) var(--space-lg);
+    }
+    .plan-row__top {
       display: flex; align-items: center; justify-content: space-between;
       flex-wrap: wrap; gap: var(--space-md);
     }
@@ -294,7 +298,18 @@ type View = 'plan' | 'backlog-list';
     .plan-row__hours {
       margin-left: var(--space-sm); font-weight: 700; color: var(--text-primary); font-size: 1rem;
     }
-    .plan-row__actions { display: flex; gap: var(--space-sm); }
+    .plan-row__actions { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+    .inline-hours-input {
+      width: 70px; padding: 4px 8px;
+      background: var(--bg-input); border: 1px solid var(--border-focus);
+      border-radius: var(--border-radius); color: var(--text-primary);
+      font-size: 0.9rem; outline: none; text-align: center;
+      &::-webkit-inner-spin-button { opacity: 1; }
+    }
+    .inline-error {
+      margin: 0; color: var(--status-error); font-size: 0.82rem;
+      padding: 2px var(--space-sm);
+    }
 
     /* Backlog list page */
     .cat-budget-badges { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
@@ -332,6 +347,16 @@ type View = 'plan' | 'backlog-list';
     }
     .backlog-row__title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 
+    /* Items already in your plan */
+    .in-plan-tag {
+      display: inline-block;
+      background: rgba(39,174,96,0.15); color: #27ae60;
+      border: 1px solid rgba(39,174,96,0.35);
+      padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+      white-space: nowrap;
+    }
+    .backlog-row--mine { opacity: 0.7; }
+
     .btn--danger { background: var(--status-error, #e74c3c); color: #fff; }
     .btn--danger:hover { filter: brightness(1.1); }
   `]
@@ -357,9 +382,10 @@ export class PlanMyWorkComponent implements OnInit {
   readonly pickingItem = signal<BacklogItem | null>(null);
   pickHours = 0;
 
-  // Change hours modal
-  readonly changingTask = signal<WeeklyPlanTask | null>(null);
-  changeHoursVal = 0;
+  // Inline hour editing (replaces Change Hours modal)
+  readonly editingTaskId = signal<string | null>(null);
+  readonly inlineEditError = signal<string>('');
+  inlineHoursVal = 0;
 
   /** localStorage key for the submitted state: plan-submit-{planId}-{userId} */
   private submitKey(planId: string): string {
@@ -416,6 +442,16 @@ export class PlanMyWorkComponent implements OnInit {
   availableBacklog(): BacklogItem[] {
     const plannedIds = new Set(this.myTasks().map(t => t.backlogItemId));
     return this.backlogItems().filter(i => i.status === 'Available' && !plannedIds.has(i.id));
+  }
+
+  /** All Available backlog items shown in the picker — including ones already in MY plan. */
+  allBacklogForPicker(): BacklogItem[] {
+    return this.backlogItems().filter(i => i.status === 'Available');
+  }
+
+  /** True if I already have this backlog item in my plan. */
+  isInMyPlan(backlogItemId: string): boolean {
+    return this.myTasks().some(t => t.backlogItemId === backlogItemId);
   }
 
   /**
@@ -557,38 +593,51 @@ export class PlanMyWorkComponent implements OnInit {
 
   // ── Change hours ────────────────────────────────────────────────────────
 
-  openChangeHours(task: WeeklyPlanTask): void {
-    this.changingTask.set(task);
-    this.changeHoursVal = task.plannedHours;
+  startInlineEdit(task: WeeklyPlanTask): void {
+    this.editingTaskId.set(task.id);
+    this.inlineHoursVal = task.plannedHours;
+    this.inlineEditError.set('');
   }
 
-  saveChangedHours(): void {
+  cancelInlineEdit(): void {
+    this.editingTaskId.set(null);
+    this.inlineEditError.set('');
+  }
+
+  saveInlineHours(task: WeeklyPlanTask): void {
+    const newHours = this.inlineHoursVal;
+    if (!newHours || newHours <= 0) return;
+    const maxAllowed = 30 - this.claimedHoursExcluding(task.id);
+    if (newHours > maxAllowed) {
+      this.inlineEditError.set(`You only have ${this.formatHours(maxAllowed)}h you can set here.`);
+      return;
+    }
     const plan = this.activePlan()!;
-    const task = this.changingTask()!;
     this.saving.set(true);
-    // Remove then re-add with new hours
+    this.inlineEditError.set('');
+    // Remove the task then re-add with new hours (same as before)
     this.api.removeTask(plan.id, task.id).subscribe({
       next: () => {
         this.api.assignTask(plan.id, {
           backlogItemId: task.backlogItemId,
           assignedUserId: this.auth.currentUser()!.id,
-          plannedHours: this.changeHoursVal
+          plannedHours: newHours
         }).subscribe({
           next: (updated) => {
             this.myTasks.update(ts => ts.map(t => t.id === task.id ? updated : t));
-            this.changingTask.set(null);
+            this.editingTaskId.set(null);
             this.saving.set(false);
             this.toast.success('Hours updated!');
             this.loadTeamDashboard(plan.id);
           },
           error: (err) => {
-            this.toast.error(err.error?.detail ?? 'Failed to update hours.');
+            this.inlineEditError.set(err.error?.detail ?? 'Failed to update hours.');
             this.saving.set(false);
           }
         });
       },
       error: (err) => {
-        this.toast.error(err.error?.detail ?? 'Failed to update hours.');
+        this.inlineEditError.set(err.error?.detail ?? 'Failed to update hours.');
         this.saving.set(false);
       }
     });

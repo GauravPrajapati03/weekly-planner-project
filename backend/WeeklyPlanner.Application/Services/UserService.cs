@@ -90,6 +90,26 @@ public class UserService : IUserService
         return ToDto(user);
     }
 
+    public async Task DeleteUserAsync(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id)
+            ?? throw new NotFoundException("User", id);
+
+        // If deleting the lead, block it only if there are other users who could be lead.
+        // (On the onboarding screen this won't happen since the user reassigns lead first.)
+        if (user.Role == UserRole.TeamLead)
+        {
+            var allUsers = await _userRepository.GetAllIncludingInactiveAsync();
+            var others = allUsers.Where(u => u.Id != id).ToList();
+            if (others.Count > 0)
+                throw new BusinessRuleException(
+                    "Cannot remove the Team Lead. Assign another member as Team Lead first.");
+        }
+
+        _userRepository.Remove(user);
+        await _userRepository.SaveChangesAsync();
+    }
+
     // ── Private Helpers ────────────────────────────────────────────────────────
 
     /// <summary>

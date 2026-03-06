@@ -15,6 +15,7 @@
   --bg-input: #1e1e38;
   --bg-modal: #1a1a2e;
   --bg-overlay: rgba(0, 0, 0, 0.65);
+  --bg-primary: #0d0d1a;
 
   /* Text */
   --text-primary: #e8e8f4;
@@ -61,6 +62,54 @@
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
   --font-heading: 'Inter Tight', 'Inter', sans-serif;
 }
+
+/* ── Light Theme Token Overrides ───────────────────────────────────────────── */
+[data-theme="light"] {
+  /* Backgrounds — warm neutral white palette */
+  --bg-base:       #f0f2f8;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #f5f7ff;
+  --bg-navbar:     #ffffff;
+  --bg-input:      #f5f7ff;
+  --bg-modal:      #ffffff;
+  --bg-overlay:    rgba(0, 0, 0, 0.35);
+  --bg-primary:    #f0f2f8;
+
+  /* Text — dark charcoal for readability */
+  --text-primary:   #1a1a2e;
+  --text-secondary: #4a4a6a;
+  --text-muted:     #8888aa;
+  --text-inverse:   #ffffff;
+
+  /* Accent — same blue, slightly richer in light context */
+  --accent:       #3b7de8;
+  --accent-hover: #2563d4;
+  --accent-glow:  rgba(59, 125, 232, 0.18);
+
+  /* Borders — very subtle */
+  --border:       #d4d8f0;
+  --border-focus: #3b7de8;
+
+  /* Shadows — softer in light mode */
+  --shadow-card:  0 2px 12px rgba(0, 0, 40, 0.08);
+  --shadow-hover: 0 6px 24px rgba(0, 0, 40, 0.12);
+  --shadow-modal: 0 12px 48px rgba(0, 0, 40, 0.18);
+}
+
+/* Light mode scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-track { background: #f0f2f8; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c5c9e0; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #a0a4c0; }
+
+/* Light mode table hover */
+[data-theme="light"] tbody tr:hover { background: rgba(0, 0, 40, 0.025); }
+[data-theme="light"] thead tr { background: rgba(0, 0, 40, 0.02); }
+[data-theme="light"] td { border-bottom-color: rgba(0, 0, 40, 0.06); }
+
+/* Light mode progress bar background */
+[data-theme="light"] .progress-bar-wrap { background: rgba(0, 0, 40, 0.08); }
+[data-theme="light"] .spinner { border-color: rgba(0,0,40,0.1); border-top-color: var(--accent); }
+
 
 /* ── Reset & Base ─────────────────────────────────────────────────────────── */
 *,
