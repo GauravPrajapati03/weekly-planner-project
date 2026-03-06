@@ -8,6 +8,10 @@ using WeeklyPlanner.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load local developer overrides (gitignored — never committed).
+// On Azure App Service, environment variables / Connection Strings override appsettings.json directly.
+builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
+
 // ── MVC / API ──────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

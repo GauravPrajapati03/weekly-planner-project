@@ -1,17 +1,19 @@
 import { Component, inject } from '@angular/core';
-import { RouterLink, Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { CommonModule } from '@angular/common';
 
 /**
  * Navbar — fixed top bar shown on every page.
- * Shows: logo, current user name, Switch User, and Home buttons.
+ * Shows: logo, current user name, theme toggle, Switch User, and Home buttons.
+ * Home button is hidden when already on the /home page.
  */
 @Component({
-    selector: 'app-navbar',
-    standalone: true,
-    imports: [RouterLink, CommonModule],
-    template: `
+  selector: 'app-navbar',
+  standalone: true,
+  imports: [RouterLink, CommonModule],
+  template: `
     <nav class="navbar">
       <div class="navbar__brand">
         <a routerLink="/home" class="navbar__logo">
@@ -33,12 +35,26 @@ import { CommonModule } from '@angular/common';
       </div>
 
       <div class="navbar__actions">
+        <!-- Theme toggle button -->
+        <button
+          class="theme-toggle"
+          (click)="theme.toggle()"
+          [attr.aria-label]="theme.isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+          [title]="theme.isDark ? 'Switch to light mode' : 'Switch to dark mode'">
+          <span class="theme-icon">{{ theme.isDark ? '☀️' : '🌙' }}</span>
+          <span class="theme-label">{{ theme.isDark ? 'Light' : 'Dark' }}</span>
+        </button>
+
         <button class="btn btn--ghost btn--sm" (click)="switchUser()">🔄 Switch</button>
-        <a routerLink="/home" class="btn btn--ghost btn--sm">🏠 Home</a>
+
+        <!-- Home button only shown when NOT on the home page -->
+        @if (!isOnHome()) {
+          <a routerLink="/home" class="btn btn--ghost btn--sm">🏠 Home</a>
+        }
       </div>
     </nav>
   `,
-    styles: [`
+  styles: [`
     .navbar {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -98,21 +114,53 @@ import { CommonModule } from '@angular/common';
 
     .navbar__actions {
       display: flex;
+      align-items: center;
       gap: var(--space-sm);
     }
 
-    @media (max-width: 600px) {
+    /* Theme toggle */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.3rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      &:hover {
+        border-color: var(--accent);
+        color: var(--text-primary);
+        background: var(--bg-card-hover);
+      }
+    }
+    .theme-icon { font-size: 1rem; line-height: 1; }
+    .theme-label { font-size: 0.75rem; }
+
+    @media (max-width: 640px) {
       .navbar__logo-text { display: none; }
+      .theme-label { display: none; }
       .navbar { padding: 0 var(--space-md); }
     }
   `]
 })
 export class NavbarComponent {
-    readonly auth = inject(AuthService);
-    private readonly router = inject(Router);
+  readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
+  private readonly router = inject(Router);
 
-    switchUser(): void {
-        this.auth.clearUser();
-        this.router.navigate(['/login']);
-    }
+  /** True when the current URL is the home page — hides the Home button */
+  isOnHome(): boolean {
+    return this.router.url === '/home' || this.router.url.startsWith('/home?');
+  }
+
+  switchUser(): void {
+    this.auth.clearUser();
+    this.router.navigate(['/login']);
+  }
 }

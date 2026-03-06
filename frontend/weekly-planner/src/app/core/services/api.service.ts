@@ -34,6 +34,10 @@ export class ApiService {
         return this.http.put<User>(`${this.base}/users/${id}`, req);
     }
 
+    deleteUser(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.base}/users/${id}`);
+    }
+
     // ── Backlog ──────────────────────────────────────────────────────────
     getBacklog(category?: CategoryType): Observable<BacklogItem[]> {
         let params = new HttpParams();

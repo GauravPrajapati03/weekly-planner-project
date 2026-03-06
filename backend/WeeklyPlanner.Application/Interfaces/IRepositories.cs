@@ -9,6 +9,7 @@ public interface IUserRepository
     Task<IEnumerable<User>> GetAllIncludingInactiveAsync();
     Task<User?> GetByIdAsync(Guid id);
     Task<User> AddAsync(User user);
+    void Remove(User user);
     Task SaveChangesAsync();
 }
 

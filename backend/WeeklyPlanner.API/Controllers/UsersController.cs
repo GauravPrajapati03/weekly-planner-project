@@ -42,4 +42,12 @@ public class UsersController : ControllerBase
         var updated = await _userService.UpdateUserAsync(id, request);
         return Ok(updated);
     }
+
+    /// <summary>Permanently deletes a team member (used by onboarding screen).</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _userService.DeleteUserAsync(id);
+        return NoContent();
+    }
 }
