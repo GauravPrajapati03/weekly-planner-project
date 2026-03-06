@@ -52,7 +52,7 @@ import { NavbarComponent } from '../../shared/navbar/navbar.component';
 
               <div class="form-group">
                 <label class="form-label">Category</label>
-                <select class="form-control" [(ngModel)]="editCategory">
+                <select class="form-control" [(ngModel)]="editCategory" [disabled]="editTarget() !== null">
                   <option value="" disabled>Pick a category</option>
                   <option value="Client">Client Focused</option>
                   <option value="TechDebt">Tech Debt</option>
@@ -339,7 +339,7 @@ export class ManageBacklogComponent implements OnInit {
   // Form fields
   editTitle = '';
   editDescription = '';
-  editCategory: CategoryType = 'Client';
+  editCategory: CategoryType | '' = '';
   editHours: number | null = null;
 
   ngOnInit(): void { this.load(); }
@@ -376,7 +376,7 @@ export class ManageBacklogComponent implements OnInit {
     this.editTarget.set(null);
     this.editTitle = '';
     this.editDescription = '';
-    this.editCategory = 'Client';
+    this.editCategory = '';   // ← empty so 'Pick a category' placeholder shows
     this.editHours = null;
     this.showForm.set(true);
   }
@@ -394,14 +394,17 @@ export class ManageBacklogComponent implements OnInit {
 
   saveForm(): void {
     if (!this.editTitle.trim()) { this.toast.error('Title is required.'); return; }
+    if (!this.editCategory) { this.toast.error('Please pick a category.'); return; }
     if (this.editHours !== null && this.editHours <= 0) { this.toast.error('Estimated hours must be > 0.'); return; }
     this.saving.set(true);
 
+    const cat = this.editCategory as CategoryType;
     const target = this.editTarget();
     if (target) {
+      // Category is NOT editable after creation — omit it from the update payload
       this.api.updateBacklogItem(target.id, {
         title: this.editTitle.trim(), description: this.editDescription.trim(),
-        category: this.editCategory, estimatedHours: this.editHours
+        estimatedHours: this.editHours
       }).subscribe({
         next: (u) => {
           this.allItems.update(l => l.map(i => i.id === u.id ? u : i));
@@ -413,7 +416,7 @@ export class ManageBacklogComponent implements OnInit {
     } else {
       this.api.createBacklogItem({
         title: this.editTitle.trim(), description: this.editDescription.trim(),
-        category: this.editCategory, estimatedHours: this.editHours
+        category: cat, estimatedHours: this.editHours
       }).subscribe({
         next: (c) => {
           this.allItems.update(l => [c, ...l]);
