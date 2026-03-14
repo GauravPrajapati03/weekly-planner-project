@@ -1,17 +1,18 @@
 name: Backend — Build, Test & Deploy
 
-# Triggers: on every push to main (after PR merge) and on PRs targeting main
+# Triggers:
+#   - Every push to main (no path filter — deploys on any merge to main)
+#   - PRs targeting main (only when backend files change)
+#   - Manual trigger via GitHub Actions UI ("Run workflow" button)
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-ci-cd.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci-cd.yml'
+  workflow_dispatch:   # ← enables the "Run workflow" button in GitHub Actions UI
 
 env:
   DOTNET_VERSION: '9.0.x'          # .NET 9 SDK is required to support the .slnx solution format
@@ -68,8 +69,8 @@ jobs:
     name: Deploy to Azure App Service
     runs-on: ubuntu-latest
     needs: build-and-test
-    # Only deploy when code is merged into main (not during PR checks)
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Only deploy when code is merged into main or triggered manually (not during PR checks)
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Download build artifact
