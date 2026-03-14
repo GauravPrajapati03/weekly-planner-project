@@ -8,10 +8,10 @@
 
 | Service | URL |
 |---|---|
-| 🌐 **Frontend App** | https://jolly-flower-0c7507b00.1.azurestaticapps.net/ |
-| ⚙️ **Backend REST API** | https://weekly-planner-project-api.azurewebsites.net/api |
-| 📖 **API Documentation (Swagger)** | https://weekly-planner-project-api.azurewebsites.net/swagger/index.html |
-| ❤️ **API Health Check** | https://weekly-planner-project-api.azurewebsites.net/health |
+| 🌐 **Frontend App** | https://polite-flower-0d45f1400.6.azurestaticapps.net/ |
+| ⚙️ **Backend REST API** | https://weekly-planner-project-apis.azurewebsites.net/api |
+| 📖 **API Documentation (Swagger)** | https://weekly-planner-project-apis.azurewebsites.net/swagger/index.html |
+| ❤️ **API Health Check** | https://weekly-planner-project-apis.azurewebsites.net/health |
 
 ---
 
